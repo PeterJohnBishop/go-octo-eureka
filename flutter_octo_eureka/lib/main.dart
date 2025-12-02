@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_octo_eureka/WebSocketTest.dart';
+import 'package:flutter_octo_eureka/components/HoverIconButton.dart';
+import 'package:flutter_octo_eureka/components/demo.dart';
+
+import 'components/NeumorphicHoverIconButton.dart';
 
 void main() {
   runApp(const MyApp());
@@ -11,6 +15,7 @@ class MyApp extends StatelessWidget {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
+
     return MaterialApp(
       title: 'Flutter Demo',
       theme: ThemeData(
@@ -31,7 +36,10 @@ class MyApp extends StatelessWidget {
         // tested with just a hot reload.
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: WebSocketTest(),
+      home: Scaffold(
+        backgroundColor: Color.fromARGB(255, 173, 183, 197),
+        body: DemoPage()
+      ),
     );
   }
 }

@@ -14,8 +14,8 @@ class _WebSocketTestState extends State<WebSocketTest> {
   late WebSocketChannel channel;
 
   final TextEditingController _controller = TextEditingController();
-  final String myName = "FlutterApp"; // The name you send to the server
-  final List<Map<String, dynamic>> _messages = []; // Store full objects now
+  final String usernam = "FlutterApp"; 
+  final List<Map<String, dynamic>> _messages = []; 
 
   @override
   void initState() {
@@ -34,6 +34,7 @@ class _WebSocketTestState extends State<WebSocketTest> {
     super.dispose();
   }
 
+  // send event 'ANNOUNCEMENT' to server
   void _sendEvent(String eventName, String data) {
     if (data.isNotEmpty) {
       final message = jsonEncode({
@@ -81,7 +82,7 @@ class _WebSocketTestState extends State<WebSocketTest> {
                     itemBuilder: (context, index) {
                       final msg = _messages[index];
 
-                      final bool isMe = msg['sender'] == myName;
+                      final bool isMe = msg['sender'] == usernam;
 
                       return Container(
                         padding: const EdgeInsets.symmetric(

@@ -2,6 +2,8 @@ package server
 
 import (
 	"fmt"
+	"go-octo-eureka/server/email"
+	"go-octo-eureka/server/mapping"
 	"go-octo-eureka/server/wsservice"
 	"log"
 	"os"
@@ -16,6 +18,19 @@ func ServeGin() {
 	if port == "" {
 		port = "8080"
 	}
+
+	resendClient, resendError := email.InitResendClient()
+	if resendError != nil {
+		log.Fatalf("Error: %v", resendError)
+	}
+
+	googleMapsClient, googleMapsError := mapping.InitGoogleMapsClient()
+	if googleMapsError != nil {
+		log.Fatalf("Error: %v", googleMapsError)
+	}
+
+	_ = resendClient     // not used yet
+	_ = googleMapsClient // not used yet
 
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()

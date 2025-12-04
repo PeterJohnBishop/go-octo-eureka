@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"go-octo-eureka/server/processing"
-	"go-octo-eureka/server/processing/output"
 	"io"
 	"net/http"
 	"time"
@@ -25,35 +24,35 @@ var StopTimesMap = make(map[string]processing.StopTime)
 var TripStopTimesMap = make(map[string][]processing.StopTime)
 
 func InitRouteMap() {
-	for _, route := range output.Routes {
+	for _, route := range processing.RouteData {
 		RoutesMap[route.RouteID] = route
 	}
 	fmt.Printf("RoutesMap initialized with %d routes\n", len(RoutesMap))
 }
 
 func InitShapesMap() {
-	for _, shape := range output.Shapes {
+	for _, shape := range processing.ShapeData {
 		ShapesMap[shape.ShapeID] = append(ShapesMap[shape.ShapeID], shape)
 	}
 	fmt.Printf("ShapesMap initialized with %d unique shape IDs\n", len(ShapesMap))
 }
 
 func InitStopsMap() {
-	for _, stop := range output.Stop {
+	for _, stop := range processing.StopData {
 		StopsMap[stop.StopID] = stop
 	}
 	fmt.Printf("StopsMap initialized with %d stops\n", len(StopsMap))
 }
 
 func InitTripsMap() {
-	for _, trip := range output.Trips {
+	for _, trip := range processing.TripData {
 		TripsMap[trip.TripID] = trip
 	}
 	fmt.Printf("TripsMap initialized with %d trips\n", len(TripsMap))
 }
 
 func InitStopTimesMap() {
-	for _, stopTime := range output.StopTime {
+	for _, stopTime := range processing.StopTimeData {
 		key := fmt.Sprintf("%s_%s", stopTime.TripID, stopTime.StopID)
 		StopTimesMap[key] = stopTime
 

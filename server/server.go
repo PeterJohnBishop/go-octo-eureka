@@ -27,7 +27,7 @@ func ServeGin() {
 
 	go func() {
 		fmt.Println("Starting GenerateTripData...")
-		haveData := processing.GenerateTripData()
+		haveData := processing.LoadTripData()
 		if haveData {
 			fmt.Println("Initializing Trip Map...")
 			transport.InitTripsMap()
@@ -37,7 +37,7 @@ func ServeGin() {
 	}()
 	go func() {
 		fmt.Println("Starting GenerateRouteData...")
-		haveData := processing.GenerateRouteData()
+		haveData := processing.LoadRouteData()
 		if haveData {
 			fmt.Println("Initializing Route Map...")
 			transport.InitRouteMap()
@@ -47,7 +47,7 @@ func ServeGin() {
 	}()
 	go func() {
 		fmt.Println("Starting GenerateShapesData...")
-		haveData := processing.GenerateShapesData()
+		haveData := processing.LoadShapeData()
 		if haveData {
 			fmt.Println("Initializing Shapes Map...")
 			transport.InitShapesMap()
@@ -57,7 +57,7 @@ func ServeGin() {
 	}()
 	go func() {
 		fmt.Println("Starting GenerateStopTimesData...")
-		haveData := processing.GenerateStopTimesData()
+		haveData := processing.LoadStopTimeData()
 		if haveData {
 			fmt.Println("Initializing Stop Times Map...")
 			transport.InitStopTimesMap()
@@ -67,7 +67,7 @@ func ServeGin() {
 	}()
 	go func() {
 		fmt.Println("Starting GenerateStopsData...")
-		haveData := processing.GenerateStopsData()
+		haveData := processing.LoadStopData()
 		if haveData {
 			fmt.Println("Initializing Stops Map...")
 			transport.InitStopsMap()

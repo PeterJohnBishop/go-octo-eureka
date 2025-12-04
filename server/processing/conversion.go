@@ -8,6 +8,12 @@ import (
 	"strings"
 )
 
+var RouteData []Route
+var ShapeData []Shape
+var StopTimeData []StopTime
+var StopData []Stop
+var TripData []Trip
+
 const outputUrl = "/Users/peterbishop/Development/go-octo-eureka/server/processing/output/"
 const inputUrl = "/Users/peterbishop/Development/go-octo-eureka/server/processing/input/"
 
@@ -30,19 +36,15 @@ func OpenFile(fileName string) ([][]string, error) {
 	return records, nil
 }
 
-func GenerateTripData() bool {
-
-	// if _, err := os.Stat(outputUrl + "stop_times.go"); err == nil {
-	// 	fmt.Println("Trip File already exists, skipping generation.")
-	// 	return true
-	// }
-
+func LoadTripData() bool {
 	records, err := OpenFile("trips.txt")
 	if err != nil {
 		fmt.Println("Error opening file:", err)
 		return false
 	}
-	var trips []Trip
+
+	var loadedTrips []Trip
+
 	for i, row := range records {
 		if i == 0 {
 			continue
@@ -52,7 +54,7 @@ func GenerateTripData() bool {
 		fmt.Sscanf(row[4], "%d", &directionID)
 		blockID := strings.TrimSpace(row[5])
 
-		trips = append(trips, Trip{
+		loadedTrips = append(loadedTrips, Trip{
 			RouteID:      row[0],
 			ServiceID:    row[1],
 			TripID:       row[2],
@@ -63,40 +65,21 @@ func GenerateTripData() bool {
 		})
 	}
 
-	outputFile := fmt.Sprintf(outputUrl + "trips.go")
-	file, err := os.Create(outputFile)
-	if err != nil {
-		fmt.Println("Error creating Go file:", err)
-		return false
-	}
-	defer file.Close()
+	TripData = loadedTrips
 
-	fmt.Fprintln(file, "package output")
-	fmt.Fprintln(file, "import \"go-octo-eureka/server/processing\"")
-	fmt.Fprintln(file, "var Trips = []processing.Trip{")
-	for _, trip := range trips {
-		fmt.Fprintf(file, "\t{RouteID: \"%s\", ServiceID: \"%s\", TripID: \"%s\", TripHeadsign: \"%s\", DirectionID: %d, BlockID: \"%s\", ShapeID: \"%s\"},\n",
-			trip.RouteID, trip.ServiceID, trip.TripID, trip.TripHeadsign, trip.DirectionID, trip.BlockID, trip.ShapeID)
-	}
-	fmt.Fprintln(file, "}")
-	fmt.Println("Go file successfully saved to", outputFile)
+	fmt.Printf("Successfully loaded %d trips into memory.\n", len(TripData))
 	return true
 }
 
-func GenerateRouteData() bool {
-
-	// if _, err := os.Stat(outputUrl + "stop_times.go"); err == nil {
-	// 	fmt.Println("Route File already exists, skipping generation.")
-	// 	return true
-	// }
-
+func LoadRouteData() bool {
 	records, err := OpenFile("routes.txt")
 	if err != nil {
 		fmt.Println("Error opening file:", err)
 		return false
 	}
 
-	var routes []Route
+	var loadedRoutes []Route
+
 	for i, row := range records {
 		if i == 0 {
 			continue
@@ -107,7 +90,8 @@ func GenerateRouteData() bool {
 		if routeType == "3" {
 			routeTypeInt = 3
 		}
-		routes = append(routes, Route{
+
+		loadedRoutes = append(loadedRoutes, Route{
 			RouteID:        row[0],
 			AgencyID:       row[1],
 			RouteShortName: row[2],
@@ -118,43 +102,23 @@ func GenerateRouteData() bool {
 			RouteColor:     row[7],
 			RouteTextColor: row[8],
 		})
-
 	}
 
-	outputFile := fmt.Sprintf(outputUrl + "routes.go")
-	file, err := os.Create(outputFile)
-	if err != nil {
-		fmt.Println("Error creating Go file:", err)
-		return false
-	}
-	defer file.Close()
+	RouteData = loadedRoutes
 
-	fmt.Fprintln(file, "package output")
-	fmt.Fprintln(file, "import \"go-octo-eureka/server/processing\"")
-	fmt.Fprintln(file, "var Routes = []processing.Route{")
-	for _, route := range routes {
-		fmt.Fprintf(file, "\t{RouteID: \"%s\", AgencyID: \"%s\", RouteShortName: \"%s\", RouteLongName: \"%s\", RouteDesc: \"%s\", RouteType: %d, RouteURL: \"%s\", RouteColor: \"%s\", RouteTextColor: \"%s\"},\n",
-			route.RouteID, route.AgencyID, route.RouteShortName, route.RouteLongName, route.RouteDesc, route.RouteType, route.RouteURL, route.RouteColor, route.RouteTextColor)
-	}
-	fmt.Fprintln(file, "}")
-	fmt.Println("Go file successfully saved to", outputFile)
+	fmt.Printf("Successfully loaded %d routes into memory.\n", len(RouteData))
 	return true
 }
 
-func GenerateShapesData() bool {
-
-	// if _, err := os.Stat(outputUrl + "stop_times.go"); err == nil {
-	// 	fmt.Println("Shape File already exists, skipping generation.")
-	// 	return true
-	// }
-
+func LoadShapeData() bool {
 	records, err := OpenFile("shapes.txt")
 	if err != nil {
 		fmt.Println("Error opening file:", err)
 		return false
 	}
 
-	var shapes []Shape
+	var loadedShapes []Shape
+
 	for i, row := range records {
 		if i == 0 {
 			continue
@@ -165,69 +129,50 @@ func GenerateShapesData() bool {
 		if shapeDistTraveled != "" {
 			fmt.Sscanf(shapeDistTraveled, "%f", &shapeDistTraveledFloat)
 		}
+
 		shapePtSequence := strings.TrimSpace(row[3])
 		shapePtSequenceInt := 0
 		if shapePtSequence != "" {
 			fmt.Sscanf(shapePtSequence, "%d", &shapePtSequenceInt)
 		}
-		shapes = append(shapes, Shape{
-			ShapeID: row[0],
-			ShapePtLat: func() float64 {
-				lat, _ := strconv.ParseFloat(row[1], 64)
-				return lat
-			}(),
-			ShapePtLon: func() float64 {
-				lon, _ := strconv.ParseFloat(row[2], 64)
-				return lon
-			}(),
+
+		lat, _ := strconv.ParseFloat(row[1], 64)
+		lon, _ := strconv.ParseFloat(row[2], 64)
+
+		loadedShapes = append(loadedShapes, Shape{
+			ShapeID:           row[0],
+			ShapePtLat:        lat,
+			ShapePtLon:        lon,
 			ShapePtSequence:   shapePtSequenceInt,
 			ShapeDistTraveled: shapeDistTraveledFloat,
 		})
-
 	}
 
-	outputFile := fmt.Sprintf(outputUrl + "shapes.go")
-	file, err := os.Create(outputFile)
-	if err != nil {
-		fmt.Println("Error creating Go file:", err)
-		return false
-	}
-	defer file.Close()
+	ShapeData = loadedShapes
 
-	fmt.Fprintln(file, "package output")
-	fmt.Fprintln(file, "import \"go-octo-eureka/server/processing\"")
-	fmt.Fprintln(file, "var Shapes = []processing.Shape{")
-	for _, shape := range shapes {
-		fmt.Fprintf(file, "\t{ShapeID: \"%s\", ShapePtLat: %f, ShapePtLon: %f, ShapePtSequence: %d, ShapeDistTraveled: %f},\n",
-			shape.ShapeID, shape.ShapePtLat, shape.ShapePtLon, shape.ShapePtSequence, shape.ShapeDistTraveled)
-	}
-	fmt.Fprintln(file, "}")
-	fmt.Println("Go file successfully saved to", outputFile)
+	fmt.Printf("Successfully loaded %d shapes into memory.\n", len(ShapeData))
 	return true
 }
 
-func GenerateStopTimesData() bool {
-
-	// if _, err := os.Stat(outputUrl + "stop_times.go"); err == nil {
-	// 	fmt.Println("StopTime File already exists, skipping generation.")
-	// 	return true
-	// }
-
+func LoadStopTimeData() bool {
 	records, err := OpenFile("stop_times.txt")
 	if err != nil {
 		fmt.Println("Error opening file:", err)
 		return false
 	}
 
-	var stopTimes []StopTime
+	var loadedStopTimes []StopTime
+
 	for i, row := range records {
 		if i == 0 {
 			continue
 		}
+
 		stopSequence, _ := strconv.Atoi(row[4])
 		pickupType, _ := strconv.Atoi(row[6])
 		dropOffType, _ := strconv.Atoi(row[7])
-		stopTimes = append(stopTimes, StopTime{
+
+		loadedStopTimes = append(loadedStopTimes, StopTime{
 			TripID:        row[0],
 			ArrivalTime:   row[1],
 			DepartureTime: row[2],
@@ -238,47 +183,30 @@ func GenerateStopTimesData() bool {
 		})
 	}
 
-	outputFile := fmt.Sprintf(outputUrl + "stop_times.go")
-	file, err := os.Create(outputFile)
-	if err != nil {
-		fmt.Println("Error creating Go file:", err)
-		return false
-	}
-	defer file.Close()
+	StopTimeData = loadedStopTimes
 
-	fmt.Fprintln(file, "package output")
-	fmt.Fprintln(file, "import \"go-octo-eureka/server/processing\"")
-	fmt.Fprintln(file, "var StopTime = []processing.StopTime{")
-	for _, stopTime := range stopTimes {
-		fmt.Fprintf(file, "\t{TripID: \"%s\", ArrivalTime: \"%s\", DepartureTime: \"%s\", StopID: \"%s\", StopSequence: %d, PickupType: %d, DropOffType: %d},\n",
-			stopTime.TripID, stopTime.ArrivalTime, stopTime.DepartureTime, stopTime.StopID, stopTime.StopSequence, stopTime.PickupType, stopTime.DropOffType)
-	}
-	fmt.Fprintln(file, "}")
-	fmt.Println("Go file successfully saved to", outputFile)
+	fmt.Printf("Successfully loaded %d stop times into memory.\n", len(StopTimeData))
 	return true
 }
 
-func GenerateStopsData() bool {
-
-	// if _, err := os.Stat(outputUrl + "stop_times.go"); err == nil {
-	// 	fmt.Println("Stop File already exists, skipping generation.")
-	// 	return true
-	// }
-
+func LoadStopData() bool {
 	records, err := OpenFile("stops.txt")
 	if err != nil {
 		fmt.Println("Error opening file:", err)
 		return false
 	}
 
-	var stops []Stop
+	var loadedStops []Stop
+
 	for i, row := range records {
 		if i == 0 {
 			continue
 		}
+
 		lat, _ := strconv.ParseFloat(row[4], 64)
 		lon, _ := strconv.ParseFloat(row[5], 64)
-		stops = append(stops, Stop{
+
+		loadedStops = append(loadedStops, Stop{
 			StopID:   row[0],
 			StopCode: row[1],
 			StopName: row[2],
@@ -288,22 +216,8 @@ func GenerateStopsData() bool {
 		})
 	}
 
-	outputFile := fmt.Sprintf(outputUrl + "stops.go")
-	file, err := os.Create(outputFile)
-	if err != nil {
-		fmt.Println("Error creating Go file:", err)
-		return false
-	}
-	defer file.Close()
+	StopData = loadedStops
 
-	fmt.Fprintln(file, "package output")
-	fmt.Fprintln(file, "import \"go-octo-eureka/server/processing\"")
-	fmt.Fprintln(file, "var Stop = []processing.Stop{")
-	for _, stop := range stops {
-		fmt.Fprintf(file, "\t{StopID: \"%s\", StopCode: \"%s\", StopName: \"%s\", StopDesc: \"%s\", StopLat: %f, StopLon: %f},\n",
-			stop.StopID, stop.StopCode, stop.StopName, stop.StopDesc, stop.StopLat, stop.StopLon)
-	}
-	fmt.Fprintln(file, "}")
-	fmt.Println("Go file successfully saved to", outputFile)
+	fmt.Printf("Successfully loaded %d stops into memory.\n", len(StopData))
 	return true
 }

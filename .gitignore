@@ -31,4 +31,8 @@ go.work.sum
 # .idea/
 # .vscode/
 
-server/processing/output/*
+server/processing/output/routes.go
+server/processing/output/shapes.go
+server/processing/output/stop_times.go
+server/processing/output/stops.go
+server/processing/output/trips.go

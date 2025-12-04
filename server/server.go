@@ -40,7 +40,7 @@ func ServeGin() {
 		haveData := processing.GenerateRouteData()
 		if haveData {
 			fmt.Println("Initializing Route Map...")
-			// handlers.InitRouteMap()
+			transport.InitRouteMap()
 		}
 		fmt.Println("Finished GenerateRouteData")
 		wg.Done()
@@ -50,7 +50,7 @@ func ServeGin() {
 		haveData := processing.GenerateShapesData()
 		if haveData {
 			fmt.Println("Initializing Shapes Map...")
-			// handlers.InitShapesMap()
+			transport.InitShapesMap()
 		}
 		fmt.Println("Finished GenerateShapesData")
 		wg.Done()
@@ -60,7 +60,7 @@ func ServeGin() {
 		haveData := processing.GenerateStopTimesData()
 		if haveData {
 			fmt.Println("Initializing Stop Times Map...")
-			// handlers.InitStopTimesMap()
+			transport.InitStopTimesMap()
 		}
 		fmt.Println("Finished GenerateStopTimesData")
 		wg.Done()
@@ -70,7 +70,7 @@ func ServeGin() {
 		haveData := processing.GenerateStopsData()
 		if haveData {
 			fmt.Println("Initializing Stops Map...")
-			// handlers.InitStopsMap()
+			transport.InitStopsMap()
 		}
 		fmt.Println("Finished GenerateStopsData")
 		wg.Done()

@@ -3,160 +3,159 @@ package transport
 import (
 	"fmt"
 	"go-octo-eureka/server/processing"
-	"go-octo-eureka/server/processing/output"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
 
-var RoutesMap = make(map[string]processing.Route)
-var ShapesMap = make(map[string]processing.Shape)
-var StopTimesMap = make(map[string]processing.StopTime)
-var StopsMap = make(map[string]processing.Stop)
-var TripsMap = make(map[string]processing.Trip)
-
-func InitRouteMap() {
-	for _, route := range output.Routes {
-		RoutesMap[route.RouteID] = route
-	}
-	fmt.Print("RoutesMap initialized with ", len(RoutesMap), " routes\n")
-}
-
-func findRouteByID(routeId string) (processing.Route, bool) {
-	route, found := RoutesMap[routeId]
-	if !found {
-		return processing.Route{}, false
-	} else {
-		return route, true
-
-	}
-}
-
-func InitShapesMap() {
-	for _, shape := range output.Shapes {
-		ShapesMap[shape.ShapeID] = shape
-	}
-	fmt.Print("ShapesMap initialized with ", len(ShapesMap), " shapes\n")
-}
-
-func findShapeById(shapeId string) (processing.Shape, bool) {
-	shape, found := ShapesMap[shapeId]
-	if !found {
-		return processing.Shape{}, false
-	} else {
-		return shape, true
-	}
-
-}
-
-func InitStopTimesMap() {
-	for _, stopTime := range output.StopTime {
-		StopTimesMap[stopTime.TripID] = stopTime
-	}
-	fmt.Print("StopTimesMap initialized with ", len(StopTimesMap), " stop times\n")
-}
-
-func findStopTimeById(tripId string) (processing.StopTime, bool) {
-	stopTime, found := StopTimesMap[tripId]
-	if !found {
-		return processing.StopTime{}, false
-	} else {
-		return stopTime, true
-	}
-}
-
-func InitStopsMap() {
-	for _, stop := range output.Stop {
-		StopsMap[stop.StopID] = stop
-	}
-	fmt.Print("StopsMap initialized with ", len(StopsMap), " stops\n")
-}
-
-func findStopById(stopId string) (processing.Stop, bool) {
-	stop, found := StopsMap[stopId]
-	if !found {
-		return processing.Stop{}, false
-	} else {
-		return stop, true
-	}
-}
-
-func InitTripsMap() {
-	for _, trip := range output.Trips {
-		TripsMap[trip.TripID] = trip
-	}
-	fmt.Print("TripsMap initialized with ", len(TripsMap), " trips\n")
-}
-
-func findTripById(tripId string) (processing.Trip, bool) {
-	trip, found := TripsMap[tripId]
-	if !found {
-		return processing.Trip{}, false
-	} else {
-		return trip, true
-	}
-}
-
+// GET /alerts
 func HandleAlert(c *gin.Context) {
 	feed, err := FetchAlerts()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Error fetching GTFS-RT: %v", err)})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Error fetching Alerts: %v", err)})
 		return
 	}
-
 	var results []any
-
 	for _, entity := range feed.Entity {
 		if entity.Alert != nil {
 			results = append(results, entity)
 		}
 	}
-
 	c.JSON(http.StatusOK, results)
 }
 
+// GET /tripupdates
 func HandleTripUpdate(c *gin.Context) {
 	feed, err := FetchTripUpdates()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Error fetching GTFS-RT: %v", err)})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Error fetching TripUpdates: %v", err)})
 		return
 	}
-
 	var results []any
-
 	for _, entity := range feed.Entity {
 		if entity.TripUpdate != nil {
 			results = append(results, entity)
 		}
 	}
-
 	c.JSON(http.StatusOK, results)
 }
 
+// GET /vehiclepositions
 func HandleVehiclePosition(c *gin.Context) {
 	feed, err := FetchVehiclePosition()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Error fetching GTFS-RT: %v", err)})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Error fetching VehiclePositions: %v", err)})
 		return
 	}
-
 	var results []any
-
 	for _, entity := range feed.Entity {
 		if entity.Vehicle != nil {
 			results = append(results, entity)
 		}
 	}
-
 	c.JSON(http.StatusOK, results)
 }
 
-func HandleDetailedVehiclePosition(c *gin.Context) {
-	positions, err := FetchDetailedVehiclePosition()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Error fetching GTFS-RT: %v", err)})
+// GET /routes
+func HandleRoutes(c *gin.Context) {
+	routes := make([]processing.Route, 0, len(RoutesMap))
+	for _, r := range RoutesMap {
+		routes = append(routes, r)
+	}
+	c.JSON(http.StatusOK, routes)
+}
+
+// GET /stops
+func HandleStops(c *gin.Context) {
+	stops := make([]processing.Stop, 0, len(StopsMap))
+	for _, s := range StopsMap {
+		stops = append(stops, s)
+	}
+	c.JSON(http.StatusOK, stops)
+}
+
+// GET /trips
+func HandleTrips(c *gin.Context) {
+	trips := make([]processing.Trip, 0, len(TripsMap))
+	for _, t := range TripsMap {
+		trips = append(trips, t)
+	}
+	c.JSON(http.StatusOK, trips)
+}
+
+// GET /shapes/:id
+func HandleShapesById(c *gin.Context) {
+	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Shape ID required"})
 		return
 	}
 
-	c.JSON(http.StatusOK, positions)
+	if shape, found := findShapeById(id); found {
+		c.JSON(http.StatusOK, shape)
+	} else {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Shape not found"})
+	}
+}
+
+func HandleStopTimesByTripId(c *gin.Context) {
+	tripID := c.Param("trip_id")
+
+	if tripID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "trip_id and stop_id query parameters required"})
+		return
+	}
+
+	if stopTimes, found := findStopTimesByTripID(tripID); found {
+		c.JSON(http.StatusOK, stopTimes)
+	} else {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Stop times not found"})
+	}
+}
+
+// GET /stoptimes?trip_id=...&stop_id=...
+func HandleStopTimesByIds(c *gin.Context) {
+	tripID := c.Param("trip_id")
+	stopID := c.Param("stop_id")
+
+	if tripID == "" || stopID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "trip_id and stop_id query parameters required"})
+		return
+	}
+
+	if stopTime, found := findStopTimeByTripAndStop(tripID, stopID); found {
+		c.JSON(http.StatusOK, stopTime)
+	} else {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Stop time not found"})
+	}
+}
+
+// GET /routes/:id
+func HandleRoutesById(c *gin.Context) {
+	id := c.Param("id")
+	if route, found := findRouteByID(id); found {
+		c.JSON(http.StatusOK, route)
+	} else {
+		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("Route with ID %s not found", id)})
+	}
+}
+
+// GET /stops/:id
+func HandleStopsById(c *gin.Context) {
+	id := c.Param("id")
+	if stop, found := findStopById(id); found {
+		c.JSON(http.StatusOK, stop)
+	} else {
+		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("Stop with ID %s not found", id)})
+	}
+}
+
+// GET /trips/:id
+func HandleTripsById(c *gin.Context) {
+	id := c.Param("id")
+	if trip, found := findTripByID(id); found {
+		c.JSON(http.StatusOK, trip)
+	} else {
+		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("Trip with ID %s not found", id)})
+	}
 }

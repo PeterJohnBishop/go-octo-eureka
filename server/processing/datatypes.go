@@ -1,13 +1,14 @@
 package processing
 
 type Trip struct {
-	RouteID      string `json:"route_id"`
-	ServiceID    string `json:"service_id"`
-	TripID       string `json:"trip_id"`
-	TripHeadsign string `json:"trip_headsign"`
-	DirectionID  int    `json:"direction_id"`
-	BlockID      string `json:"block_id"`
-	ShapeID      string `json:"shape_id"`
+	RouteID      string   `json:"route_id"`
+	ServiceID    string   `json:"service_id"`
+	TripID       string   `json:"trip_id"`
+	TripHeadsign string   `json:"trip_headsign"`
+	DirectionID  int      `json:"direction_id"`
+	BlockID      string   `json:"block_id"`
+	ShapeID      string   `json:"shape_id"`
+	Shape        *[]Shape `json:"shape,omitempty"`
 }
 
 type Route struct {
@@ -72,9 +73,4 @@ type Position struct {
 	TripID               string  `json:"trip_id"`
 	VehicleID            string  `json:"vehicle_id"`
 	VehicleLabel         string  `json:"vehicle_label"`
-
-	// Pointers are used here to allow these fields to be null in JSON
-	RouteDetails *Route `json:"route_details"`
-	StopDetails  *Stop  `json:"stop_details"`
-	TripDetails  *Trip  `json:"trip_details"`
 }

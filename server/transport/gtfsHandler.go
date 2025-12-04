@@ -15,12 +15,65 @@ func HandleAlert(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Error fetching Alerts: %v", err)})
 		return
 	}
-	var results []any
+
+	var results []processing.AlertEntity
+
 	for _, entity := range feed.Entity {
-		if entity.Alert != nil {
-			results = append(results, entity)
+		if entity.Alert == nil {
+			continue
 		}
+
+		var activePeriods []processing.ActivePeriod
+		for _, ap := range entity.Alert.ActivePeriod {
+			activePeriods = append(activePeriods, processing.ActivePeriod{
+				Start: int64(ap.GetStart()),
+				End:   int64(ap.GetEnd()),
+			})
+		}
+
+		var informedEntities []processing.InformedEntity
+		for _, ie := range entity.Alert.InformedEntity {
+			informedEntities = append(informedEntities, processing.InformedEntity{
+				AgencyID:  ie.GetAgencyId(),
+				RouteID:   ie.GetRouteId(),
+				RouteType: int(ie.GetRouteType()),
+				StopID:    ie.GetStopId(),
+			})
+		}
+
+		var headerTranslations []processing.Translation
+		if entity.Alert.HeaderText != nil {
+			for _, t := range entity.Alert.HeaderText.Translation {
+				headerTranslations = append(headerTranslations, processing.Translation{
+					Text:     t.GetText(),
+					Language: t.GetLanguage(),
+				})
+			}
+		}
+
+		var descTranslations []processing.Translation
+		if entity.Alert.DescriptionText != nil {
+			for _, t := range entity.Alert.DescriptionText.Translation {
+				descTranslations = append(descTranslations, processing.Translation{
+					Text:     t.GetText(),
+					Language: t.GetLanguage(),
+				})
+			}
+		}
+
+		results = append(results, processing.AlertEntity{
+			ID: entity.GetId(),
+			Alert: processing.Alert{
+				ActivePeriod:    activePeriods,
+				InformedEntity:  informedEntities,
+				Cause:           int(entity.Alert.GetCause()),
+				Effect:          int(entity.Alert.GetEffect()),
+				HeaderText:      processing.TranslatedString{Translation: headerTranslations},
+				DescriptionText: processing.TranslatedString{Translation: descTranslations},
+			},
+		})
 	}
+
 	c.JSON(http.StatusOK, results)
 }
 
@@ -31,12 +84,47 @@ func HandleTripUpdate(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Error fetching TripUpdates: %v", err)})
 		return
 	}
-	var results []any
+
+	var results []processing.TripUpdateEntity
+
 	for _, entity := range feed.Entity {
-		if entity.TripUpdate != nil {
-			results = append(results, entity)
+		if entity.TripUpdate == nil {
+			continue
 		}
+
+		tu := entity.TripUpdate
+
+		// Map StopTimeUpdates
+		var stopTimeUpdates []processing.StopTimeUpdate
+		for _, stu := range tu.StopTimeUpdate {
+			stopTimeUpdates = append(stopTimeUpdates, processing.StopTimeUpdate{
+				StopSequence:         int(stu.GetStopSequence()),
+				StopID:               stu.GetStopId(),
+				Arrival:              processing.StopTimeEvent{Time: int64(stu.GetArrival().GetTime())},
+				Departure:            processing.StopTimeEvent{Time: int64(stu.GetDeparture().GetTime())},
+				ScheduleRelationship: int(stu.GetScheduleRelationship()),
+			})
+		}
+
+		results = append(results, processing.TripUpdateEntity{
+			ID: entity.GetId(),
+			TripUpdate: processing.TripUpdate{
+				Trip: processing.TripDescriptor{
+					TripID:               tu.GetTrip().GetTripId(),
+					RouteID:              tu.GetTrip().GetRouteId(),
+					DirectionID:          int(tu.GetTrip().GetDirectionId()),
+					ScheduleRelationship: int(tu.GetTrip().GetScheduleRelationship()),
+				},
+				Vehicle: processing.VehicleDescriptor{
+					ID:    tu.GetVehicle().GetId(),
+					Label: tu.GetVehicle().GetLabel(),
+				},
+				StopTimeUpdate: stopTimeUpdates,
+				Timestamp:      int64(tu.GetTimestamp()),
+			},
+		})
 	}
+
 	c.JSON(http.StatusOK, results)
 }
 
@@ -47,12 +135,42 @@ func HandleVehiclePosition(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Error fetching VehiclePositions: %v", err)})
 		return
 	}
-	var results []any
+
+	var results []processing.VehiclePositionEntity
+
 	for _, entity := range feed.Entity {
-		if entity.Vehicle != nil {
-			results = append(results, entity)
+		if entity.Vehicle == nil {
+			continue
 		}
+
+		v := entity.Vehicle
+
+		results = append(results, processing.VehiclePositionEntity{
+			ID: entity.GetId(),
+			Vehicle: processing.VehiclePosition{
+				Trip: processing.TripDescriptor{
+					TripID:               v.GetTrip().GetTripId(),
+					RouteID:              v.GetTrip().GetRouteId(),
+					DirectionID:          int(v.GetTrip().GetDirectionId()),
+					ScheduleRelationship: int(v.GetTrip().GetScheduleRelationship()),
+				},
+				Vehicle: processing.VehicleDescriptor{
+					ID:    v.GetVehicle().GetId(),
+					Label: v.GetVehicle().GetLabel(),
+				},
+				Position: processing.GeoPosition{
+					Latitude:  float64(v.GetPosition().GetLatitude()),
+					Longitude: float64(v.GetPosition().GetLongitude()),
+					Bearing:   float64(v.GetPosition().GetBearing()),
+				},
+				StopID:          v.GetStopId(),
+				CurrentStatus:   int(v.GetCurrentStatus()),
+				Timestamp:       int64(v.GetTimestamp()),
+				OccupancyStatus: int(v.GetOccupancyStatus()),
+			},
+		})
 	}
+
 	c.JSON(http.StatusOK, results)
 }
 
@@ -98,6 +216,7 @@ func HandleShapesById(c *gin.Context) {
 	}
 }
 
+// GET /stoptimes/trip/:trip_id
 func HandleStopTimesByTripId(c *gin.Context) {
 	tripID := c.Param("trip_id")
 
@@ -113,7 +232,7 @@ func HandleStopTimesByTripId(c *gin.Context) {
 	}
 }
 
-// GET /stoptimes?trip_id=...&stop_id=...
+// GET /stoptimes/trip/:trip_id/stop/:stop_id
 func HandleStopTimesByIds(c *gin.Context) {
 	tripID := c.Param("trip_id")
 	stopID := c.Param("stop_id")

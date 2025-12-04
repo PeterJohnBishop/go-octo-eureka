@@ -14,7 +14,6 @@ var StopTimeData []StopTime
 var StopData []Stop
 var TripData []Trip
 
-const outputUrl = "/Users/peterbishop/Development/go-octo-eureka/server/processing/output/"
 const inputUrl = "/Users/peterbishop/Development/go-octo-eureka/server/processing/input/"
 
 func OpenFile(fileName string) ([][]string, error) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_octo_eureka/WebSocketTest.dart';
 import 'package:flutter_octo_eureka/components/HoverIconButton.dart';
 import 'package:flutter_octo_eureka/components/demo.dart';
+import 'package:flutter_octo_eureka/maps/maps.dart';
 
 import 'components/NeumorphicHoverIconButton.dart';
 
@@ -38,7 +39,7 @@ class MyApp extends StatelessWidget {
       ),
       home: Scaffold(
         backgroundColor: Color.fromARGB(255, 173, 183, 197),
-        body: DemoPage()
+        body: BaseMapWidget()
       ),
     );
   }

@@ -1,14 +1,13 @@
 package processing
 
 type Trip struct {
-	RouteID      string   `json:"route_id"`
-	ServiceID    string   `json:"service_id"`
-	TripID       string   `json:"trip_id"`
-	TripHeadsign string   `json:"trip_headsign"`
-	DirectionID  int      `json:"direction_id"`
-	BlockID      string   `json:"block_id"`
-	ShapeID      string   `json:"shape_id"`
-	Shape        *[]Shape `json:"shape,omitempty"`
+	RouteID      string `json:"route_id"`
+	ServiceID    string `json:"service_id"`
+	TripID       string `json:"trip_id"`
+	TripHeadsign string `json:"trip_headsign"`
+	DirectionID  int    `json:"direction_id"`
+	BlockID      string `json:"block_id"`
+	ShapeID      string `json:"shape_id"`
 }
 
 type Route struct {
@@ -59,18 +58,94 @@ type Stop struct {
 	WheelchairBoarding int     `json:"wheelchair_boarding"`
 }
 
-type Position struct {
-	Bearing              float64 `json:"bearing"`
-	CurrentStatus        string  `json:"current_status"`
-	DirectionID          int     `json:"direction_id"`
-	Latitude             float64 `json:"latitude"`
-	Longitude            float64 `json:"longitude"`
-	OccupancyStatus      string  `json:"occupancy_status"`
-	RouteID              string  `json:"route_id"`
-	ScheduleRelationship string  `json:"schedule_relationship"`
-	StopID               string  `json:"stop_id"`
-	Timestamp            int64   `json:"timestamp"`
-	TripID               string  `json:"trip_id"`
-	VehicleID            string  `json:"vehicle_id"`
-	VehicleLabel         string  `json:"vehicle_label"`
+type AlertEntity struct {
+	ID    string `json:"id"`
+	Alert Alert  `json:"alert"`
+}
+
+type Alert struct {
+	ActivePeriod    []ActivePeriod   `json:"active_period"`
+	InformedEntity  []InformedEntity `json:"informed_entity"`
+	Cause           int              `json:"cause"`
+	Effect          int              `json:"effect"`
+	HeaderText      TranslatedString `json:"header_text"`
+	DescriptionText TranslatedString `json:"description_text"`
+}
+
+type ActivePeriod struct {
+	Start int64 `json:"start"`
+	End   int64 `json:"end,omitempty"`
+}
+
+type InformedEntity struct {
+	AgencyID  string `json:"agency_id"`
+	RouteID   string `json:"route_id"`
+	RouteType int    `json:"route_type"`
+	StopID    string `json:"stop_id,omitempty"`
+}
+
+type TranslatedString struct {
+	Translation []Translation `json:"translation"`
+}
+
+type Translation struct {
+	Text     string `json:"text"`
+	Language string `json:"language"`
+}
+
+type TripUpdateEntity struct {
+	ID         string     `json:"id"`
+	TripUpdate TripUpdate `json:"trip_update"`
+}
+
+type TripUpdate struct {
+	Trip           TripDescriptor    `json:"trip"`
+	Vehicle        VehicleDescriptor `json:"vehicle"`
+	StopTimeUpdate []StopTimeUpdate  `json:"stop_time_update"`
+	Timestamp      int64             `json:"timestamp"`
+}
+
+type TripDescriptor struct {
+	TripID               string `json:"trip_id"`
+	RouteID              string `json:"route_id"`
+	DirectionID          int    `json:"direction_id"`
+	ScheduleRelationship int    `json:"schedule_relationship"` // 0=Scheduled, 1=Added, 2=Unscheduled, 3=Canceled
+}
+
+type VehicleDescriptor struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
+}
+
+type StopTimeUpdate struct {
+	StopSequence         int           `json:"stop_sequence"`
+	StopID               string        `json:"stop_id"`
+	Arrival              StopTimeEvent `json:"arrival"`
+	Departure            StopTimeEvent `json:"departure"`
+	ScheduleRelationship int           `json:"schedule_relationship"`
+}
+
+type StopTimeEvent struct {
+	Time int64 `json:"time"`
+}
+
+type VehiclePositionEntity struct {
+	ID      string          `json:"id"`
+	Vehicle VehiclePosition `json:"vehicle"`
+}
+
+type VehiclePosition struct {
+	Trip            TripDescriptor    `json:"trip"`
+	Vehicle         VehicleDescriptor `json:"vehicle"`
+	Position        GeoPosition       `json:"position"`
+	StopID          string            `json:"stop_id"`
+	CurrentStatus   int               `json:"current_status"`
+	Timestamp       int64             `json:"timestamp"`
+	OccupancyStatus int               `json:"occupancy_status"`
+}
+
+type GeoPosition struct {
+	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
+	Bearing   float64 `json:"bearing"`
 }

@@ -23,7 +23,7 @@ func OpenFile(fileName string) ([][]string, error) {
 		log.Fatal(err)
 	}
 	inputUrl := filepath.Join(homeDir, "Development", "go-octo-eureka", "server", "processing", "input")
-	file, err := os.Open(inputUrl + fileName)
+	file, err := os.Open(inputUrl + "/" + fileName)
 	if err != nil {
 		fmt.Println("Error opening file:", err)
 		return nil, err

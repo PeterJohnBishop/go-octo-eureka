@@ -3,7 +3,9 @@ package processing
 import (
 	"encoding/csv"
 	"fmt"
+	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -14,9 +16,13 @@ var StopTimeData []StopTime
 var StopData []Stop
 var TripData []Trip
 
-const inputUrl = "/Users/peterbishop/Development/go-octo-eureka/server/processing/input/"
-
 func OpenFile(fileName string) ([][]string, error) {
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatal(err)
+	}
+	inputUrl := filepath.Join(homeDir, "Development", "go-octo-eureka", "server", "processing", "input")
 	file, err := os.Open(inputUrl + fileName)
 	if err != nil {
 		fmt.Println("Error opening file:", err)

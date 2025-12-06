@@ -37,9 +37,9 @@ class GtfsApiService {
     return (data as List).map((json) => VehiclePositionEntity.fromJson(json)).toList();
   }
 
-  Future<List<Route>> fetchRoutes() async {
+  Future<List<gtfsRoute>> fetchRoutes() async {
     final data = await _get('/routes');
-    return (data as List).map((json) => Route.fromJson(json)).toList();
+    return (data as List).map((json) => gtfsRoute.fromJson(json)).toList();
   }
 
   Future<List<Stop>> fetchStops() async {
@@ -53,14 +53,13 @@ class GtfsApiService {
   }
 
   Future<List<Shape>> fetchShapeById(String id) async {
-    // Assuming 'shape' returns a list of points (polyline)
     final data = await _get('/shapes/$id');
     return (data as List).map((json) => Shape.fromJson(json)).toList();
   }
 
-  Future<Route> fetchRouteById(String id) async {
+  Future<gtfsRoute> fetchRouteById(String id) async {
     final data = await _get('/routes/$id');
-    return Route.fromJson(data);
+    return gtfsRoute.fromJson(data);
   }
 
   Future<Stop> fetchStopById(String id) async {

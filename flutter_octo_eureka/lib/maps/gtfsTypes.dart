@@ -1,4 +1,6 @@
 
+import 'dart:ui';
+
 class Trip {
   final String routeId;
   final String serviceId;
@@ -43,7 +45,7 @@ class Trip {
   }
 }
 
-class Route {
+class gtfsRoute {
   final String routeId;
   final String agencyId;
   final String routeShortName;
@@ -54,7 +56,7 @@ class Route {
   final String routeColor;
   final String routeTextColor;
 
-  Route({
+  gtfsRoute({
     required this.routeId,
     required this.agencyId,
     required this.routeShortName,
@@ -66,8 +68,8 @@ class Route {
     required this.routeTextColor,
   });
 
-  factory Route.fromJson(Map<String, dynamic> json) {
-    return Route(
+  factory gtfsRoute.fromJson(Map<String, dynamic> json) {
+    return gtfsRoute(
       routeId: json['route_id'] ?? '',
       agencyId: json['agency_id'] ?? '',
       routeShortName: json['route_short_name'] ?? '',
@@ -128,6 +130,62 @@ class Shape {
       'shape_pt_sequence': shapePtSequence,
       'shape_dist_traveled': shapeDistTraveled,
     };
+  }
+}
+
+class PolyShape {
+  final String shapeId;
+  final double shapePtLat;
+  final double shapePtLon;
+  final int shapePtSequence;
+  final double shapeDistTraveled;
+  final String? routeColor; // Field for the color string (e.g., "0076CE")
+
+  PolyShape({
+    required this.shapeId,
+    required this.shapePtLat,
+    required this.shapePtLon,
+    required this.shapePtSequence,
+    required this.shapeDistTraveled,
+    this.routeColor,
+  });
+
+  // Helper to get the actual Flutter Color object
+  Color get color {
+    if (routeColor == null || routeColor!.isEmpty) {
+      return const Color(0xFF000000); // Default to black if no color
+    }
+    try {
+      // GTFS colors are usually 6-character hex strings (e.g., "0076CE")
+      // We need to prefix "0xFF" for full opacity
+      return Color(int.parse("0xFF$routeColor"));
+    } catch (e) {
+      return const Color(0xFF000000);
+    }
+  }
+
+  // Mapper to create PolyShape from existing Shape + Color
+  factory PolyShape.fromShape(Shape shape, String? color) {
+    return PolyShape(
+      shapeId: shape.shapeId,
+      shapePtLat: shape.shapePtLat,
+      shapePtLon: shape.shapePtLon,
+      shapePtSequence: shape.shapePtSequence,
+      shapeDistTraveled: shape.shapeDistTraveled,
+      routeColor: color,
+    );
+  }
+
+  factory PolyShape.fromJson(Map<String, dynamic> json) {
+    return PolyShape(
+      shapeId: json['shape_id'] ?? '',
+      shapePtLat: (json['shape_pt_lat'] as num?)?.toDouble() ?? 0.0,
+      shapePtLon: (json['shape_pt_lon'] as num?)?.toDouble() ?? 0.0,
+      shapePtSequence: json['shape_pt_sequence'] ?? 0,
+      shapeDistTraveled:
+          (json['shape_dist_traveled'] as num?)?.toDouble() ?? 0.0,
+      routeColor: json['route_color'],
+    );
   }
 }
 

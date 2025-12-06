@@ -20,6 +20,7 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
   List<StopTime> _vehicleStopTimes = [];
   List<Polyline> _vehiclePolylines = [];
   Map<String, gtfsRoute> _routeMap = {};
+  List<Marker> _stopMarkers = [];
 
   bool _isLoading = true;
   var shapeIds = ["1316772", "1317062"];
@@ -41,7 +42,6 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
       });
       await loadVehicleRoutes(vehiclePositions);
       await loadVehicleTrips(vehiclePositions);
-      await loadVehicleStops(vehiclePositions);
     } catch (e) {
       debugPrint("Error fetching vehicle positions: $e");
     }
@@ -93,30 +93,46 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
         _vehicleTrips = vehicleTrips;
       });
       await loadVehicleShapes(vehicleTrips);
+      await loadRouteStops(vehicleTrips);
     } catch (e) {
       debugPrint("Error fetching trips: $e");
     }
   }
 
-  Future<void> loadVehicleStops(List<VehiclePositionEntity> vehicles) async {
-    final Set<String> uniqueStopIds = vehicles
-        .map((v) => v.vehicle?.stopId)
-        .where((id) => id != null)
-        .cast<String>()
+Future<void> loadRouteStops(List<Trip> trips) async {
+  try {
+    // 1. Fetch StopTimes for all active trips
+    final List<Future<List<StopTime>>> stopTimeFutures = trips
+        .map((trip) => gtfs.fetchStopTimesByTripId(trip.tripId))
+        .toList();
+
+    final List<List<StopTime>> stopTimeResults = await Future.wait(stopTimeFutures);
+    
+    // Flatten the list of lists into one big list of StopTimes
+    final List<StopTime> allStopTimes = stopTimeResults.expand((x) => x).toList();
+
+    // 2. Extract Unique Stop IDs from the StopTimes
+    final Set<String> uniqueStopIds = allStopTimes
+        .map((st) => st.stopId)
         .toSet();
 
-    try {
-      final List<Stop> vehicleStops = await Future.wait(
-        uniqueStopIds.map((id) => gtfs.fetchStopById(id)),
-      );
-
-      setState(() {
-        _vehicleStops = vehicleStops;
-      });
-    } catch (e) {
-      debugPrint("Error fetching vehicle stops: $e");
+    if (uniqueStopIds.isEmpty) {
+      debugPrint("No stops found for these trips.");
+      return;
     }
+
+    // 3. Fetch the actual Stop objects (lat/lon)
+    final List<Stop> fetchedStops = await Future.wait(
+      uniqueStopIds.map((id) => gtfs.fetchStopById(id)),
+    );
+
+    // 4. Update the map
+    _processStopData(fetchedStops);
+
+  } catch (e) {
+    debugPrint("Error fetching route stops: $e");
   }
+}
 
   Future<void> loadVehicleShapes(List<Trip> uniqueTrips) async {
     try {
@@ -161,6 +177,44 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  void _processStopData(List<Stop> data) {
+            print("generating stop markers for ${data.length} stops");
+
+    final List<Marker> markers = data.map((stop) {
+      return Marker(
+        point: LatLng(stop.stopLat, stop.stopLon),
+        width: 30.0,
+        height: 30.0,
+        // Using a child (flutter_map v6+) or builder (older versions)
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.blueAccent, width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black26,
+                blurRadius: 4,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: const Icon(
+            Icons.directions_bus, // Or Icons.stop_circle
+            color: Colors.red,
+            size: 18.0,
+          ),
+        ),
+      );
+    }).toList();
+
+    if (mounted) {
+      setState(() {
+        _stopMarkers = markers;
+      });
     }
   }
 
@@ -216,6 +270,7 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
                 userAgentPackageName: 'com.example.app',
               ),
               PolylineLayer(polylines: _vehiclePolylines),
+              MarkerLayer(markers: _stopMarkers),
             ],
           ),
           if (_isLoading) const Center(child: CircularProgressIndicator()),

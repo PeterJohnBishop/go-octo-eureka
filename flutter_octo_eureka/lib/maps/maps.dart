@@ -13,17 +13,19 @@ class BaseMapWidget extends StatefulWidget {
 
 class _BaseMapWidgetState extends State<BaseMapWidget> {
   final GtfsApiService gtfs = GtfsApiService();
+
   List<VehiclePositionEntity> _vehiclePositions = [];
-  List<gtfsRoute> _vehicleRoutes = [];
-  List<Trip> _vehicleTrips = [];
-  List<Stop> _vehicleStops = [];
-  List<StopTime> _vehicleStopTimes = [];
+
+  final Map<String, gtfsRoute> _routeMap = {};
+  final Map<String, Trip> _tripMap = {};
+  final Map<String, Stop> _stopMap = {};
+  final Map<String, List<StopTime>> _stopTimesMap = {};
+
+  final Set<String> _processedShapeIds = {};
   List<Polyline> _vehiclePolylines = [];
-  Map<String, gtfsRoute> _routeMap = {};
   List<Marker> _stopMarkers = [];
 
   bool _isLoading = true;
-  var shapeIds = ["1316772", "1317062"];
 
   @override
   void initState() {
@@ -31,19 +33,31 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
     _loadVehiclePositions();
   }
 
+  // load vehicle positions for position, route ids, and trip ids
   Future<void> _loadVehiclePositions() async {
     try {
-      final Future<List<VehiclePositionEntity>> futures = gtfs
+      final List<VehiclePositionEntity> vehiclePositions = await gtfs
           .fetchVehiclePositions();
 
-      final List<VehiclePositionEntity> vehiclePositions = await futures;
+      if (!mounted) return;
+
       setState(() {
         _vehiclePositions = vehiclePositions;
       });
+
+      // load routes for line colors
       await loadVehicleRoutes(vehiclePositions);
+
+      // load trips for shape ids
       await loadVehicleTrips(vehiclePositions);
     } catch (e) {
       debugPrint("Error fetching vehicle positions: $e");
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -60,14 +74,12 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
 
     if (idsToFetch.isEmpty) return;
 
-    final List<Future<gtfsRoute>> fetchThese = idsToFetch
-        .map((id) => gtfs.fetchRouteById(id))
-        .toList();
-
     try {
-      final List<gtfsRoute> fetchedRoutes = await Future.wait(fetchThese);
+      final List<Future<gtfsRoute>> fetchThese = idsToFetch
+          .map((id) => gtfs.fetchRouteById(id))
+          .toList();
 
-      _vehicleRoutes.addAll(fetchedRoutes);
+      final List<gtfsRoute> fetchedRoutes = await Future.wait(fetchThese);
 
       for (var route in fetchedRoutes) {
         _routeMap[route.routeId] = route;
@@ -84,71 +96,86 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
         .cast<String>()
         .toSet();
 
+    final List<String> idsToFetch = uniqueTripIds
+        .where((id) => !_tripMap.containsKey(id))
+        .toList();
+
+    if (idsToFetch.isEmpty) return;
+
     try {
-      final List<Trip> vehicleTrips = await Future.wait(
-        uniqueTripIds.map((id) => gtfs.fetchTripById(id)),
+      final List<Trip> newTrips = await Future.wait(
+        idsToFetch.map((id) => gtfs.fetchTripById(id)),
       );
 
-      setState(() {
-        _vehicleTrips = vehicleTrips;
-      });
-      await loadVehicleShapes(vehicleTrips);
-      await loadRouteStops(vehicleTrips);
+      for (var trip in newTrips) {
+        _tripMap[trip.tripId] = trip;
+      }
+
+      await loadVehicleShapes(newTrips);
+      await loadRouteStops(newTrips);
     } catch (e) {
       debugPrint("Error fetching trips: $e");
     }
   }
 
-Future<void> loadRouteStops(List<Trip> trips) async {
-  try {
-    // 1. Fetch StopTimes for all active trips
-    final List<Future<List<StopTime>>> stopTimeFutures = trips
-        .map((trip) => gtfs.fetchStopTimesByTripId(trip.tripId))
-        .toList();
-
-    final List<List<StopTime>> stopTimeResults = await Future.wait(stopTimeFutures);
-    
-    // Flatten the list of lists into one big list of StopTimes
-    final List<StopTime> allStopTimes = stopTimeResults.expand((x) => x).toList();
-
-    // 2. Extract Unique Stop IDs from the StopTimes
-    final Set<String> uniqueStopIds = allStopTimes
-        .map((st) => st.stopId)
-        .toSet();
-
-    if (uniqueStopIds.isEmpty) {
-      debugPrint("No stops found for these trips.");
-      return;
-    }
-
-    // 3. Fetch the actual Stop objects (lat/lon)
-    final List<Stop> fetchedStops = await Future.wait(
-      uniqueStopIds.map((id) => gtfs.fetchStopById(id)),
-    );
-
-    // 4. Update the map
-    _processStopData(fetchedStops);
-
-  } catch (e) {
-    debugPrint("Error fetching route stops: $e");
-  }
-}
-
-  Future<void> loadVehicleShapes(List<Trip> uniqueTrips) async {
+  Future<void> loadRouteStops(List<Trip> newTrips) async {
     try {
-      final Set<String> uniqueShapeIds = uniqueTrips
+      final List<Future<List<StopTime>>> stopTimeFutures = newTrips
+          .map((trip) => gtfs.fetchStopTimesByTripId(trip.tripId))
+          .toList();
+
+      final List<List<StopTime>> stopTimeResults = await Future.wait(
+        stopTimeFutures,
+      );
+      final List<StopTime> allStopTimes = stopTimeResults
+          .expand((x) => x)
+          .toList();
+
+      for (var stopTime in allStopTimes) {
+        if (!_stopTimesMap.containsKey(stopTime.stopId)) {
+          _stopTimesMap[stopTime.stopId] = [];
+        }
+        _stopTimesMap[stopTime.stopId]!.add(stopTime);
+      }
+
+      final Set<String> uniqueStopIds = allStopTimes
+          .map((st) => st.stopId)
+          .toSet();
+
+      final List<String> stopIdsToFetch = uniqueStopIds
+          .where((id) => !_stopMap.containsKey(id))
+          .toList();
+
+      if (stopIdsToFetch.isNotEmpty) {
+        final List<Stop> fetchedStops = await Future.wait(
+          stopIdsToFetch.map((id) => gtfs.fetchStopById(id)),
+        );
+
+        for (var stop in fetchedStops) {
+          _stopMap[stop.stopId] = stop;
+        }
+      }
+
+      _rebuildStopMarkers();
+    } catch (e) {
+      debugPrint("Error fetching route stops: $e");
+    }
+  }
+
+  Future<void> loadVehicleShapes(List<Trip> newTrips) async {
+    try {
+      final Set<String> uniqueShapeIds = newTrips
           .map((t) => t.shapeId)
+          .where((id) => id.isNotEmpty && !_processedShapeIds.contains(id))
           .toSet();
 
       if (uniqueShapeIds.isEmpty) return;
 
       final Map<String, String> shapeColorMap = {};
-
-      for (var trip in uniqueTrips) {
-        if (trip.shapeId.isEmpty) continue;
+      for (var trip in newTrips) {
+        if (!uniqueShapeIds.contains(trip.shapeId)) continue;
 
         final route = _routeMap[trip.routeId];
-
         final String color = (route != null && route.routeColor.isNotEmpty)
             ? route.routeColor
             : "0076CE";
@@ -168,33 +195,27 @@ Future<void> loadRouteStops(List<Trip> trips) async {
         return PolyShape.fromShape(shape, color);
       }).toList();
 
-      _processShapeData(coloredShapes);
+      _processedShapeIds.addAll(uniqueShapeIds);
+
+      _appendShapeData(coloredShapes);
     } catch (e) {
       debugPrint("Error fetching shapes: $e");
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
     }
   }
 
-  void _processStopData(List<Stop> data) {
-            print("generating stop markers for ${data.length} stops");
+  void _rebuildStopMarkers() {
 
-    final List<Marker> markers = data.map((stop) {
+    final List<Marker> markers = _stopMap.values.map((stop) {
       return Marker(
         point: LatLng(stop.stopLat, stop.stopLon),
         width: 30.0,
         height: 30.0,
-        // Using a child (flutter_map v6+) or builder (older versions)
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
             shape: BoxShape.circle,
             border: Border.all(color: Colors.blueAccent, width: 2),
-            boxShadow: [
+            boxShadow: const [
               BoxShadow(
                 color: Colors.black26,
                 blurRadius: 4,
@@ -203,7 +224,7 @@ Future<void> loadRouteStops(List<Trip> trips) async {
             ],
           ),
           child: const Icon(
-            Icons.directions_bus, // Or Icons.stop_circle
+            Icons.directions_bus,
             color: Colors.red,
             size: 18.0,
           ),
@@ -218,10 +239,10 @@ Future<void> loadRouteStops(List<Trip> trips) async {
     }
   }
 
-  void _processShapeData(List<PolyShape> data) {
+  void _appendShapeData(List<PolyShape> newData) {
     final Map<String, List<PolyShape>> groupedShapes = {};
 
-    for (var point in data) {
+    for (var point in newData) {
       final String id = point.shapeId;
       if (!groupedShapes.containsKey(id)) {
         groupedShapes[id] = [];
@@ -229,7 +250,7 @@ Future<void> loadRouteStops(List<Trip> trips) async {
       groupedShapes[id]!.add(point);
     }
 
-    final List<Polyline> vehiclePolylines = [];
+    final List<Polyline> newPolylines = [];
 
     groupedShapes.forEach((id, points) {
       points.sort((a, b) => a.shapePtSequence.compareTo(b.shapePtSequence));
@@ -242,14 +263,14 @@ Future<void> loadRouteStops(List<Trip> trips) async {
           ? points.first.color
           : Colors.green;
 
-      vehiclePolylines.add(
+      newPolylines.add(
         Polyline(points: coordinates, strokeWidth: 4.0, color: polyColor),
       );
     });
 
     if (mounted) {
       setState(() {
-        _vehiclePolylines = vehiclePolylines;
+        _vehiclePolylines.addAll(newPolylines);
       });
     }
   }
@@ -262,7 +283,7 @@ Future<void> loadRouteStops(List<Trip> trips) async {
           FlutterMap(
             options: MapOptions(
               initialCenter: const LatLng(39.7392, -104.9903),
-              initialZoom: 9.2,
+              initialZoom: 10,
             ),
             children: [
               TileLayer(

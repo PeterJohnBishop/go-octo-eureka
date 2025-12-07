@@ -139,7 +139,7 @@ class PolyShape {
   final double shapePtLon;
   final int shapePtSequence;
   final double shapeDistTraveled;
-  final String? routeColor; // Field for the color string (e.g., "0076CE")
+  final String? routeColor; 
 
   PolyShape({
     required this.shapeId,
@@ -150,21 +150,18 @@ class PolyShape {
     this.routeColor,
   });
 
-  // Helper to get the actual Flutter Color object
   Color get color {
     if (routeColor == null || routeColor!.isEmpty) {
-      return const Color(0xFF000000); // Default to black if no color
+      return const Color(0xFF000000); 
     }
     try {
-      // GTFS colors are usually 6-character hex strings (e.g., "0076CE")
-      // We need to prefix "0xFF" for full opacity
+      
       return Color(int.parse("0xFF$routeColor"));
     } catch (e) {
       return const Color(0xFF000000);
     }
   }
 
-  // Mapper to create PolyShape from existing Shape + Color
   factory PolyShape.fromShape(Shape shape, String? color) {
     return PolyShape(
       shapeId: shape.shapeId,
@@ -453,7 +450,6 @@ class TranslatedString {
     };
   }
 
-  // Helper to quickly get English text
   String get text {
     if (translation.isEmpty) return '';
     try {

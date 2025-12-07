@@ -12,52 +12,126 @@ class MapService {
     return vehiclePositions;
   }
 
-  Future<Map<String, gtfsRoute>> loadRoutes() async {
-    final routes = await gtfs.fetchRoutes();
-    final routeMap = {for (var route in routes) route.routeId: route};
-    return routeMap;
-  }
-  // {
-  //   "route_id": "40",
-  //   "agency_id": "RTD",
-  //   "route_short_name": "40",
-  //   "route_long_name": "Colorado Boulevard",
-  //   "route_desc": "This Route Travels Northbound & Southbound",
-  //   "route_type": 3,
-  //   "route_url": "http://www.rtd-denver.com/Schedules.shtml",
-  //   "route_color": "0076CE",
-  //   "route_text_color": "FFFFFF"
-  // }
+  Future<List<gtfsRoute>> loadVehicleRoutes(
+    List<VehiclePositionEntity> vehicles,
+  ) async {
+    final Set<String> uniqueRouteIds = vehicles
+        .map((v) => v.vehicle?.trip?.routeId)
+        .where((id) => id != null)
+        .cast<String>()
+        .toSet();
 
-  Future<Map<String, Trip>> loadTrips() async {
-    final trips = await gtfs.fetchTrips();
-    final tripMap = {for (var trip in trips) trip.tripId: trip};
-    return tripMap;
-  }
-  // {
-  //   "route_id": "40",
-  //   "service_id": "WK",
-  //   "trip_id": "115551400",
-  //   "trip_headsign": "40th & Colorado Stn via Colorado Blvd",
-  //   "direction_id": 0,
-  //   "block_id": "40  1",
-  //   "shape_id": "1317039"
-  // }
+    Future<gtfsRoute?> safeFetchRoute(String id) async {
+      try {
+        return await gtfs.fetchRouteById(id);
+      } catch (e) {
+        print("Warning: Route $id not found. Skipping.");
+        return null;
+      }
+    }
 
-  Future<List<Shape>> loadShapePoints(String shapeId) async {
-    final shapePoints = await gtfs.fetchShapeById(shapeId);
-    return shapePoints;
+    final results = await Future.wait(
+      uniqueRouteIds.map((id) => safeFetchRoute(id)),
+    );
+
+    return results.whereType<gtfsRoute>().toList();
   }
-  // [
-  //   {
-  //       "shape_id": "1317039",
-  //       "shape_pt_lat": 39.648763,
-  //       "shape_pt_lon": -104.915242,
-  //       "shape_pt_sequence": 1,
-  //       "shape_dist_traveled": 0
-  //   },
-  //   {...}
-  // ]
+
+  Future<List<Trip>> loadVehicleTrips(
+    List<VehiclePositionEntity> vehicles,
+  ) async {
+    final Set<String> uniqueTripIds = vehicles
+        .map((v) => v.vehicle?.trip?.tripId)
+        .where((id) => id != null)
+        .cast<String>()
+        .toSet();
+
+    Future<Trip?> safeFetchTrip(String id) async {
+      try {
+        return await gtfs.fetchTripById(id);
+      } catch (e) {
+        print("Warning: Trip $id not found (404). Skipping.");
+        return null;
+      }
+    }
+
+    final List<Trip?> results = await Future.wait(
+      uniqueTripIds.map((id) => safeFetchTrip(id)),
+    );
+
+    return results.whereType<Trip>().toList();
+  }
+
+  Future<List<Shape>> loadTripShapes(String shapeId) async {
+    final shapes = await gtfs.fetchShapeById(shapeId);
+    return shapes;
+  }
+
+  Future<List<StopTime>> loadTripStopTimes(String tripId) async {
+    final stopTimes = await gtfs.fetchStopTimesByTripId(tripId);
+    return stopTimes;
+  }
+
+  Future<List<Stop>> loadTripStops(List<StopTime> stopTimes) async {
+    final Set<String> uniqueStopIds = stopTimes.map((s) => s.stopId).toSet();
+
+    if (uniqueStopIds.isEmpty) return [];
+
+    try {
+      final List<Stop> fetchedStops = await Future.wait(
+        uniqueStopIds.map((id) => gtfs.fetchStopById(id)),
+      );
+      return fetchedStops;
+    } catch (e) {
+      debugPrint("Error fetching trip stops: $e");
+      return [];
+    }
+  }
+
+  Future<Stop> loadStop(String stopId) async {
+    var stop = gtfs.fetchStopById(stopId);
+    return stop;
+  }
+
+  List<DropdownMenuItem<String>> buildRouteDropdownItems(
+    List<gtfsRoute> routes,
+  ) {
+    return routes.map((route) {
+      Color routeColor = Colors.black;
+      if (route.routeColor.isNotEmpty) {
+        try {
+          final hex = route.routeColor.replaceAll('#', '');
+          routeColor = Color(int.parse("0xFF$hex"));
+        } catch (_) {
+          // Keep default black on error
+        }
+      }
+
+      return DropdownMenuItem<String>(
+        value: route.routeId,
+        child: Row(
+          children: [
+            Container(
+              width: 14,
+              height: 14,
+              decoration: BoxDecoration(
+                color: routeColor,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                "${route.routeShortName}: ${route.routeLongName}",
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 14),
+              ),
+            ),
+          ],
+        ),
+      );
+    }).toList();
+  }
 
   Future<List<Polyline>> buildPolylinesForRoute(
     List<Shape> shapePoints,
@@ -97,68 +171,6 @@ class MapService {
     return polylines;
   }
 
-  Future<Map<String, List<StopTime>>> loadTripStopTimes(String tripId) async {
-    final stopTimes = await gtfs.fetchStopTimesByTripId(tripId);
-    final stopTimesMap = <String, List<StopTime>>{};
-    for (var stopTime in stopTimes) {
-      stopTimesMap.putIfAbsent(stopTime.tripId, () => []).add(stopTime);
-    }
-    return stopTimesMap;
-  }
-  // [
-  //   {
-  //       "trip_id": "115551400",
-  //       "arrival_time": "23:01:00",
-  //       "departure_time": "23:01:00",
-  //       "stop_id": "26312",
-  //       "stop_sequence": 1,
-  //       "stop_headsign": "",
-  //       "pickup_type": 0,
-  //       "drop_off_type": 1,
-  //       "shape_dist_traveled": 0,
-  //       "timepoint": 0
-  //   },
-  //   {...}
-  // ]
-
-  Future<Map<String, Stop>> loadTripStops(
-    Map<String, List<StopTime>> stopTimesMap,
-  ) async {
-    final Set<String> uniqueStopIds = stopTimesMap.values
-        .expand((list) => list)
-        .map((stopTime) => stopTime.stopId)
-        .toSet();
-
-    if (uniqueStopIds.isEmpty) return {};
-
-    try {
-      final List<Stop> fetchedStops = await Future.wait(
-        uniqueStopIds.map((id) => gtfs.fetchStopById(id)),
-      );
-      final Map<String, Stop> stopMap = {
-        for (var stop in fetchedStops) stop.stopId: stop,
-      };
-      return stopMap;
-    } catch (e) {
-      debugPrint("Error fetching trip stops: $e");
-      return {};
-    }
-  }
-  // {
-  //   "stop_id": "13140",
-  //   "stop_code": "13140",
-  //   "stop_name": "S Colorado Blvd & Ohio Ave",
-  //   "stop_desc": "Vehicles Travelling North",
-  //   "stop_lat": 39.70235,
-  //   "stop_lon": -104.940514,
-  //   "zone_id": "",
-  //   "stop_url": "",
-  //   "location_type": 0,
-  //   "parent_station": "",
-  //   "stop_timezone": "",
-  //   "wheelchair_boarding": 0
-  // }
-
   Marker buildStop(Stop stop) {
     return Marker(
       point: LatLng(stop.stopLat, stop.stopLon),
@@ -182,4 +194,3 @@ class MapService {
     );
   }
 }
-

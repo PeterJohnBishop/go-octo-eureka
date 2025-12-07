@@ -2,10 +2,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_octo_eureka/maps/gtfsTypes.dart';
 
-
 class GtfsApiService {
-
-  static const String baseUrl = "http://localhost:8080/gtfs"; 
+  static const String baseUrl = "http://localhost:8080/gtfs";
 
   Future<dynamic> _get(String endpoint) async {
     final url = Uri.parse('$baseUrl$endpoint');
@@ -29,27 +27,16 @@ class GtfsApiService {
 
   Future<List<TripUpdateEntity>> fetchTripUpdates() async {
     final data = await _get('/tripupdates');
-    return (data as List).map((json) => TripUpdateEntity.fromJson(json)).toList();
+    return (data as List)
+        .map((json) => TripUpdateEntity.fromJson(json))
+        .toList();
   }
 
   Future<List<VehiclePositionEntity>> fetchVehiclePositions() async {
     final data = await _get('/vehiclepositions');
-    return (data as List).map((json) => VehiclePositionEntity.fromJson(json)).toList();
-  }
-
-  Future<List<gtfsRoute>> fetchRoutes() async {
-    final data = await _get('/routes');
-    return (data as List).map((json) => gtfsRoute.fromJson(json)).toList();
-  }
-
-  Future<List<Stop>> fetchStops() async {
-    final data = await _get('/stops');
-    return (data as List).map((json) => Stop.fromJson(json)).toList();
-  }
-
-  Future<List<Trip>> fetchTrips() async {
-    final data = await _get('/trips');
-    return (data as List).map((json) => Trip.fromJson(json)).toList();
+    return (data as List)
+        .map((json) => VehiclePositionEntity.fromJson(json))
+        .toList();
   }
 
   Future<List<Shape>> fetchShapeById(String id) async {
@@ -75,6 +62,21 @@ class GtfsApiService {
   Future<List<StopTime>> fetchStopTimesByTripId(String tripId) async {
     final data = await _get('/stoptimes/trip/$tripId');
     return (data as List).map((json) => StopTime.fromJson(json)).toList();
+  }
+
+  Future<List<gtfsRoute>> fetchRoutes() async {
+    final data = await _get('/routes');
+    return (data as List).map((json) => gtfsRoute.fromJson(json)).toList();
+  }
+
+  Future<List<Stop>> fetchStops() async {
+    final data = await _get('/stops');
+    return (data as List).map((json) => Stop.fromJson(json)).toList();
+  }
+
+  Future<List<Trip>> fetchTrips() async {
+    final data = await _get('/trips');
+    return (data as List).map((json) => Trip.fromJson(json)).toList();
   }
 
   Future<StopTime> fetchStopTimeByIds(String tripId, String stopId) async {

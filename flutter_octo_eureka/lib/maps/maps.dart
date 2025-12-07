@@ -67,7 +67,16 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
           _vehiclePositions = positions;
           _routes = routes;
           _trips = trips;
-          _routeMenuItems = menuItems;
+          _routeMenuItems = [
+            const DropdownMenuItem<String>(
+              value: null, // Use null to signify "Show All"
+              child: Text(
+                "All Routes",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+            ...menuItems, // Spread the route-specific items
+          ];
           _isLoading = false;
 
           _refreshMapLayers();
@@ -140,6 +149,12 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
     List<Polyline> newPolylines = [];
     List<Marker> newMarkers = [];
 
+    final tripToRouteIdMap = {for (var t in _trips) t.tripId: t.routeId};
+
+    final routeTypeMap = {for (var r in _routes) r.routeId: r.routeType};
+
+    final routeColorMap = {for (var r in _routes) r.routeId: r.routeColor};
+
     final visibleTrips = _selectedRouteId == null
         ? _trips
         : _trips.where((t) => t.routeId == _selectedRouteId).toList();
@@ -147,14 +162,23 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
     for (var trip in visibleTrips) {
       if (trip.shapeId != null && _shapeCache.containsKey(trip.shapeId)) {
         final points = _shapeCache[trip.shapeId]!;
-        final color = Colors.blue;
+
+        final routeId = trip.routeId;
+        final colorHex = routeId != null ? routeColorMap[routeId] : null;
+
+        Color polylineColor;
+        if (colorHex != null && colorHex.isNotEmpty) {
+          polylineColor = _colorFromHex(colorHex);
+        } else {
+          polylineColor = Colors.grey;
+        }
 
         newPolylines.add(
           Polyline(
             points: points
                 .map((p) => LatLng(p.shapePtLat, p.shapePtLon))
                 .toList(),
-            color: color,
+            color: polylineColor,
             strokeWidth: 4.0,
           ),
         );
@@ -171,14 +195,32 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
     for (var v in visibleVehicles) {
       final lat = v.vehicle?.position?.latitude;
       final lon = v.vehicle?.position?.longitude;
+      final tripId = v.vehicle?.trip?.tripId;
 
-      if (lat != null && lon != null) {
+      if (lat != null && lon != null && tripId != null) {
+        final routeId = tripToRouteIdMap[tripId];
+        final routeType = routeId != null ? routeTypeMap[routeId] : null;
+
+        IconData iconData;
+        Color iconColor;
+
+        if (routeType == 0) {
+          iconData = Icons.train;
+          iconColor = Colors.black;
+        } else if (routeType == 3) {
+          iconData = Icons.directions_bus;
+          iconColor = Colors.red;
+        } else {
+          iconData = Icons.directions_bus;
+          iconColor = Colors.grey;
+        }
+
         newMarkers.add(
           Marker(
             point: LatLng(lat, lon),
             width: 30,
             height: 30,
-            child: const Icon(Icons.directions_bus, color: Colors.red),
+            child: Icon(iconData, color: iconColor),
           ),
         );
       }
@@ -188,6 +230,18 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
       _activePolylines = newPolylines;
       _activeMarkers = newMarkers;
     });
+  }
+
+  Color _colorFromHex(String hexColor) {
+    String color = hexColor.toUpperCase().replaceAll('#', '');
+    if (color.length == 6) {
+      color = 'FF$color';
+    }
+    try {
+      return Color(int.parse(color, radix: 16));
+    } catch (e) {
+      return Colors.blue;
+    }
   }
 
   @override

@@ -5,13 +5,16 @@ import 'package:flutter_octo_eureka/maps/gtfsTypes.dart';
 import 'package:latlong2/latlong.dart';
 
 class MapService {
+  // for api requests through the Go server
   final GtfsApiService gtfs = GtfsApiService();
 
+  // load real-time vehicle position data
   Future<List<VehiclePositionEntity>> loadVehiclePositions() async {
     final vehiclePositions = await gtfs.fetchVehiclePositions();
     return vehiclePositions;
   }
 
+  // load all active routes
   Future<List<gtfsRoute>> loadVehicleRoutes(
     List<VehiclePositionEntity> vehicles,
   ) async {
@@ -37,6 +40,7 @@ class MapService {
     return results.whereType<gtfsRoute>().toList();
   }
 
+  // load all active trips
   Future<List<Trip>> loadVehicleTrips(
     List<VehiclePositionEntity> vehicles,
   ) async {
@@ -62,16 +66,19 @@ class MapService {
     return results.whereType<Trip>().toList();
   }
 
+  // load Shape data for each trip
   Future<List<Shape>> loadTripShapes(String shapeId) async {
     final shapes = await gtfs.fetchShapeById(shapeId);
     return shapes;
   }
 
+  // load trip stop times
   Future<List<StopTime>> loadTripStopTimes(String tripId) async {
     final stopTimes = await gtfs.fetchStopTimesByTripId(tripId);
     return stopTimes;
   }
 
+  // load trip stops
   Future<List<Stop>> loadTripStops(List<StopTime> stopTimes) async {
     final Set<String> uniqueStopIds = stopTimes.map((s) => s.stopId).toSet();
 
@@ -93,6 +100,7 @@ class MapService {
     return stop;
   }
 
+  // build route dropdown items
   List<DropdownMenuItem<String>> buildRouteDropdownItems(
     List<gtfsRoute> routes,
   ) {

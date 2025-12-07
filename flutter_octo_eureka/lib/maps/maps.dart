@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_octo_eureka/maps/gtfsApiService.dart';
@@ -36,32 +38,40 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
   List<Polyline> _activePolylines = [];
   List<Marker> _activeMarkers = [];
 
+  // auto-refresh
+  Timer? _updateTimer;
+
   @override
   void initState() {
     super.initState();
     _fetchVehiclePositionsData();
+    _startAutoRefresh();
   }
 
-  Future<void> _fetchVehiclePositionsData() async {
-    setState(() => _isLoading = true);
+  @override
+  void dispose() {
+    _updateTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _fetchVehiclePositionsData({bool isBackground = false}) async {
+    if (!isBackground) {
+      setState(() => _isLoading = true);
+    }
     try {
       final positions = await mapService.loadVehiclePositions();
       if (positions.isEmpty) {
-        if (mounted) setState(() => _isLoading = false);
+        if (!isBackground && mounted) setState(() => _isLoading = false);
         return;
       }
-
       final results = await Future.wait([
         mapService.loadVehicleRoutes(positions),
         mapService.loadVehicleTrips(positions),
       ]);
-
       final List<gtfsRoute> routes = results[0] as List<gtfsRoute>;
       final List<Trip> trips = results[1] as List<Trip>;
       final menuItems = mapService.buildRouteDropdownItems(routes);
-
       await _loadAllActiveData(trips);
-
       if (mounted) {
         setState(() {
           _vehiclePositions = positions;
@@ -69,17 +79,21 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
           _trips = trips;
           _routeMenuItems = [
             const DropdownMenuItem<String>(
-              value: null, // Use null to signify "Show All"
+              value: null,
               child: Text(
                 "All Routes",
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
-            ...menuItems, // Spread the route-specific items
+            ...menuItems,
           ];
           _isLoading = false;
-
           _refreshMapLayers();
+          if (isBackground) {
+            debugPrint(
+              "Background refresh complete: ${positions.length} vehicles updated.",
+            );
+          }
         });
       }
     } catch (e) {
@@ -95,10 +109,8 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
           .where((id) => id != null)
           .cast<String>()
           .toSet();
-
       for (var shapeId in neededShapeIds) {
         if (_shapeCache.containsKey(shapeId)) continue;
-
         try {
           final shapes = await mapService.loadTripShapes(shapeId);
           _shapeCache[shapeId] = shapes;
@@ -107,28 +119,23 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
         }
       }
     });
-
     final stopLoadFuture = Future(() async {
       final neededTripIds = activeTrips
           .map((t) => t.tripId)
           .where((id) => id != null)
           .cast<String>()
           .toSet();
-
       Set<String> foundStopIds = {};
-
       for (var tripId in neededTripIds) {
         if (_stopTimeCache.containsKey(tripId)) continue;
         try {
           final times = await mapService.loadTripStopTimes(tripId);
           _stopTimeCache[tripId] = times;
-
           foundStopIds.addAll(times.map((t) => t.stopId).whereType<String>());
         } catch (e) {
           debugPrint("SafeFetch: Error loading stopTimes for $tripId: $e");
         }
       }
-
       for (var stopId in foundStopIds) {
         if (_stopCache.containsKey(stopId)) continue;
         try {
@@ -139,40 +146,30 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
         }
       }
     });
-
     await Future.wait([shapeLoadFuture, stopLoadFuture]);
   }
 
   void _refreshMapLayers() {
     if (!mounted) return;
-
     List<Polyline> newPolylines = [];
     List<Marker> newMarkers = [];
-
     final tripToRouteIdMap = {for (var t in _trips) t.tripId: t.routeId};
-
     final routeTypeMap = {for (var r in _routes) r.routeId: r.routeType};
-
     final routeColorMap = {for (var r in _routes) r.routeId: r.routeColor};
-
     final visibleTrips = _selectedRouteId == null
         ? _trips
         : _trips.where((t) => t.routeId == _selectedRouteId).toList();
-
     for (var trip in visibleTrips) {
       if (trip.shapeId != null && _shapeCache.containsKey(trip.shapeId)) {
         final points = _shapeCache[trip.shapeId]!;
-
         final routeId = trip.routeId;
         final colorHex = routeId != null ? routeColorMap[routeId] : null;
-
         Color polylineColor;
         if (colorHex != null && colorHex.isNotEmpty) {
           polylineColor = _colorFromHex(colorHex);
         } else {
           polylineColor = Colors.grey;
         }
-
         newPolylines.add(
           Polyline(
             points: points
@@ -184,9 +181,7 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
         );
       }
     }
-
     final visibleTripIds = visibleTrips.map((t) => t.tripId).toSet();
-
     final visibleVehicles = _vehiclePositions.where((v) {
       if (_selectedRouteId == null) return true;
       return visibleTripIds.contains(v.vehicle?.trip?.tripId);
@@ -196,14 +191,11 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
       final lat = v.vehicle?.position?.latitude;
       final lon = v.vehicle?.position?.longitude;
       final tripId = v.vehicle?.trip?.tripId;
-
       if (lat != null && lon != null && tripId != null) {
         final routeId = tripToRouteIdMap[tripId];
         final routeType = routeId != null ? routeTypeMap[routeId] : null;
-
         IconData iconData;
         Color iconColor;
-
         if (routeType == 0) {
           iconData = Icons.train;
           iconColor = Colors.black;
@@ -214,7 +206,6 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
           iconData = Icons.directions_bus;
           iconColor = Colors.grey;
         }
-
         newMarkers.add(
           Marker(
             point: LatLng(lat, lon),
@@ -225,7 +216,6 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
         );
       }
     }
-
     setState(() {
       _activePolylines = newPolylines;
       _activeMarkers = newMarkers;
@@ -242,6 +232,13 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
     } catch (e) {
       return Colors.blue;
     }
+  }
+
+  void _startAutoRefresh() {
+    _updateTimer = Timer.periodic(const Duration(minutes: 2), (timer) {
+      debugPrint("Auto-refreshing GTFS data...");
+      _fetchVehiclePositionsData(isBackground: true);
+    });
   }
 
   @override

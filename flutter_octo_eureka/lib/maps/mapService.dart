@@ -202,3 +202,159 @@ class MapService {
     );
   }
 }
+
+class VehiclePinIcon extends StatelessWidget {
+  final Color iconColor;
+  final IconData vehicleIconData;
+  final double size;
+
+  const VehiclePinIcon({
+    Key? key,
+    required this.iconColor,
+    required this.vehicleIconData,
+    this.size = 40.0,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final double whiteCircleSize = size * 0.6;  
+    final double innerIconSize = size * 0.4;   
+    final double topOffset = size * 0.1;        
+
+    return Stack(
+      alignment: Alignment.topCenter,
+      children: [
+        Icon(
+          Icons.place, 
+          color: iconColor,
+          size: size,
+          shadows: [
+            Shadow(
+              blurRadius: 2.0,
+              color: Colors.black.withOpacity(0.3),
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+
+        Padding(
+          padding: EdgeInsets.only(top: topOffset),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
+                width: whiteCircleSize,
+                height: whiteCircleSize,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              Icon(
+                vehicleIconData,
+                color: iconColor,
+                size: innerIconSize,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class VehicleMarkerMenu extends StatelessWidget {
+  final Widget child; // The original VehiclePinIcon
+  final VoidCallback onCompassPressed;
+  final VoidCallback onWarningPressed;
+  final VoidCallback onInfoPressed;
+  final VoidCallback onStopsPressed;
+
+  const VehicleMarkerMenu({
+    super.key,
+    required this.child,
+    required this.onCompassPressed,
+    required this.onWarningPressed,
+    required this.onInfoPressed,
+    required this.onStopsPressed
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const double buttonSize = 40.0;
+    
+    return Stack(
+      alignment: Alignment.center,
+      clipBehavior: Clip.none, 
+      children: [
+        child,
+
+        // reorient the map to match the bearing of the vehicle 
+        Positioned(
+          left: 0,
+          child: _buildMenuButton(
+            icon: Icons.explore,
+            color: Colors.black,
+            onTap: onCompassPressed,
+            size: buttonSize,
+          ),
+        ),
+
+        // tap to show service alerts
+        Positioned(
+          top: 0,
+          child: _buildMenuButton(
+            icon: Icons.warning_amber_rounded,
+            color: Colors.orange,
+            onTap: onWarningPressed,
+            size: buttonSize,
+          ),
+        ),
+
+        // tap for vehicle info (status, capacity, headsign)
+        Positioned(
+          right: 0,
+          child: _buildMenuButton(
+            icon: Icons.info_outline,
+            color: Colors.teal,
+            onTap: onInfoPressed,
+            size: buttonSize,
+          ),
+        ),
+
+        Positioned(
+          bottom: 0,
+          child: _buildMenuButton(
+            icon: Icons.list_outlined,
+            color: Colors.red,
+            onTap: onStopsPressed,
+            size: buttonSize,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMenuButton({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+    required double size,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(blurRadius: 4, color: Colors.black26, offset: Offset(0, 2))
+          ],
+        ),
+        child: Icon(icon, color: color, size: 24),
+      ),
+    );
+  }
+}

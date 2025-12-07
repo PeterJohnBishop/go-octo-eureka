@@ -33,10 +33,9 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
   bool _isLoading = true;
   String? _selectedRouteId;
   List<DropdownMenuItem<String>> _routeMenuItems = [];
-
-  // Map Display Lists
   List<Polyline> _activePolylines = [];
   List<Marker> _activeMarkers = [];
+  String? _selectedVehicleId;
 
   // auto-refresh
   Timer? _updateTimer;
@@ -191,27 +190,65 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
       final lat = v.vehicle?.position?.latitude;
       final lon = v.vehicle?.position?.longitude;
       final tripId = v.vehicle?.trip?.tripId;
+      final vehicleId = v.id;
       if (lat != null && lon != null && tripId != null) {
+        final isSelected = _selectedVehicleId == vehicleId;
+        final double markerSize = isSelected ? 160.0 : 50.0;
         final routeId = tripToRouteIdMap[tripId];
         final routeType = routeId != null ? routeTypeMap[routeId] : null;
         IconData iconData;
         Color iconColor;
-        if (routeType == 0) {
+        final colorHex = routeId != null ? routeColorMap[routeId] : null;
+        if (colorHex != null && colorHex.isNotEmpty) {
+          iconColor = _colorFromHex(colorHex);
+        } else {
+          iconColor = Colors.grey;
+        }
+        if (routeType == 0 || routeType == 2) {
           iconData = Icons.train;
-          iconColor = Colors.black;
         } else if (routeType == 3) {
           iconData = Icons.directions_bus;
-          iconColor = Colors.red;
         } else {
           iconData = Icons.directions_bus;
           iconColor = Colors.grey;
         }
+
+        Widget markerContent = VehiclePinIcon(
+          iconColor: iconColor,
+          vehicleIconData: iconData,
+          size: 45.0,
+        );
+
+        // WRAPPER: If selected, wrap in the menu
+        if (isSelected) {
+          markerContent = VehicleMarkerMenu(
+            child: markerContent,
+            onCompassPressed: () => debugPrint("Compass tapped for $vehicleId"),
+            onWarningPressed: () => debugPrint("Warning tapped for $vehicleId"),
+            onInfoPressed: () => debugPrint("Info tapped for $vehicleId"),
+            onStopsPressed: () => debugPrint("List stops tapped for $vehicleId"),
+          );
+        } else {
+          // If not selected, wrap in GestureDetector to handle the selection tap
+          markerContent = GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedVehicleId = vehicleId;
+                _refreshMapLayers(); // Rebuild to expand this marker
+              });
+            },
+            child: markerContent,
+          );
+        }
+
         newMarkers.add(
           Marker(
             point: LatLng(lat, lon),
-            width: 30,
-            height: 30,
-            child: Icon(iconData, color: iconColor),
+            width: markerSize,
+            height: markerSize,
+            alignment: Alignment
+                .center, // Important: Keep center alignment so expansion is even
+            child: markerContent,
           ),
         );
       }
@@ -247,12 +284,20 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
       body: Stack(
         children: [
           FlutterMap(
-            options: const MapOptions(
+            options: MapOptions(
               initialCenter: LatLng(39.7392, -104.9903),
               initialZoom: 12,
               interactionOptions: InteractionOptions(
                 flags: InteractiveFlag.all,
               ),
+              onTap: (tapPosition, point) {
+                if (_selectedVehicleId != null) {
+                  setState(() {
+                    _selectedVehicleId = null;
+                    _refreshMapLayers();
+                  });
+                }
+              },
             ),
             children: [
               TileLayer(

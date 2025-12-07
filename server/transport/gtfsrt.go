@@ -23,74 +23,7 @@ var TripsMap = make(map[string]processing.Trip)
 var StopTimesMap = make(map[string]processing.StopTime)
 var TripStopTimesMap = make(map[string][]processing.StopTime)
 
-func InitRouteMap() {
-	for _, route := range processing.RouteData {
-		RoutesMap[route.RouteID] = route
-	}
-	fmt.Printf("RoutesMap initialized with %d routes\n", len(RoutesMap))
-}
-
-func InitShapesMap() {
-	for _, shape := range processing.ShapeData {
-		ShapesMap[shape.ShapeID] = append(ShapesMap[shape.ShapeID], shape)
-	}
-	fmt.Printf("ShapesMap initialized with %d unique shape IDs\n", len(ShapesMap))
-}
-
-func InitStopsMap() {
-	for _, stop := range processing.StopData {
-		StopsMap[stop.StopID] = stop
-	}
-	fmt.Printf("StopsMap initialized with %d stops\n", len(StopsMap))
-}
-
-func InitTripsMap() {
-	for _, trip := range processing.TripData {
-		TripsMap[trip.TripID] = trip
-	}
-	fmt.Printf("TripsMap initialized with %d trips\n", len(TripsMap))
-}
-
-func InitStopTimesMap() {
-	for _, stopTime := range processing.StopTimeData {
-		key := fmt.Sprintf("%s_%s", stopTime.TripID, stopTime.StopID)
-		StopTimesMap[key] = stopTime
-
-		TripStopTimesMap[stopTime.TripID] = append(TripStopTimesMap[stopTime.TripID], stopTime)
-	}
-	fmt.Printf("StopTimesMap initialized. TripStopTimesMap has %d trips with schedules.\n", len(TripStopTimesMap))
-}
-
-func findRouteByID(routeId string) (processing.Route, bool) {
-	route, found := RoutesMap[routeId]
-	return route, found
-}
-
-func findShapeById(shapeId string) ([]processing.Shape, bool) {
-	shape, found := ShapesMap[shapeId]
-	return shape, found
-}
-
-func findStopById(stopId string) (processing.Stop, bool) {
-	stop, found := StopsMap[stopId]
-	return stop, found
-}
-
-func findTripByID(tripId string) (processing.Trip, bool) {
-	trip, found := TripsMap[tripId]
-	return trip, found
-}
-
-func findStopTimesByTripID(tripId string) ([]processing.StopTime, bool) {
-	stopTimes, found := TripStopTimesMap[tripId]
-	return stopTimes, found
-}
-
-func findStopTimeByTripAndStop(tripId, stopId string) (processing.StopTime, bool) {
-	key := fmt.Sprintf("%s_%s", tripId, stopId)
-	stopTime, found := StopTimesMap[key]
-	return stopTime, found
-}
+// GTFS-RT fetching
 
 func fetchFeed(url string) (*gtfs.FeedMessage, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -134,4 +67,83 @@ func FetchTripUpdates() (*gtfs.FeedMessage, error) {
 
 func FetchVehiclePosition() (*gtfs.FeedMessage, error) {
 	return fetchFeed(rtdVehiclePosition)
+}
+
+// routes
+
+func InitRouteMap() {
+	for _, route := range processing.RouteData {
+		RoutesMap[route.RouteID] = route
+	}
+	fmt.Printf("RoutesMap initialized with %d routes\n", len(RoutesMap))
+}
+
+func findRouteByID(routeId string) (processing.Route, bool) {
+	route, found := RoutesMap[routeId]
+	return route, found
+}
+
+// trips
+
+func InitTripsMap() {
+	for _, trip := range processing.TripData {
+		TripsMap[trip.TripID] = trip
+	}
+	fmt.Printf("TripsMap initialized with %d trips\n", len(TripsMap))
+}
+
+func findTripByID(tripId string) (processing.Trip, bool) {
+	trip, found := TripsMap[tripId]
+	return trip, found
+}
+
+// stops
+
+func InitStopsMap() {
+	for _, stop := range processing.StopData {
+		StopsMap[stop.StopID] = stop
+	}
+	fmt.Printf("StopsMap initialized with %d stops\n", len(StopsMap))
+}
+
+func findStopById(stopId string) (processing.Stop, bool) {
+	stop, found := StopsMap[stopId]
+	return stop, found
+}
+
+// stop times
+
+func InitStopTimesMap() {
+	for _, stopTime := range processing.StopTimeData {
+		key := fmt.Sprintf("%s_%s", stopTime.TripID, stopTime.StopID)
+		StopTimesMap[key] = stopTime
+
+		TripStopTimesMap[stopTime.TripID] = append(TripStopTimesMap[stopTime.TripID], stopTime)
+	}
+	fmt.Printf("StopTimesMap initialized. TripStopTimesMap has %d trips with schedules.\n", len(TripStopTimesMap))
+}
+
+func findStopTimesByTripID(tripId string) ([]processing.StopTime, bool) {
+	stopTimes, found := TripStopTimesMap[tripId]
+	return stopTimes, found
+}
+
+func findStopTimeByTripAndStop(tripId, stopId string) (processing.StopTime, bool) {
+	key := fmt.Sprintf("%s_%s", tripId, stopId)
+	stopTime, found := StopTimesMap[key]
+	return stopTime, found
+}
+
+// shapes
+
+func InitShapesMap() {
+	for _, shape := range processing.ShapeData {
+		ShapesMap[shape.ShapeID] = append(ShapesMap[shape.ShapeID], shape)
+	}
+	fmt.Printf("ShapesMap initialized with %d unique shape IDs\n", len(ShapesMap))
+}
+
+func findShapeById(shapeId string) ([]processing.Shape, bool) {
+	shape, found := ShapesMap[shapeId]
+	return shape, found
 }

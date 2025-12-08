@@ -156,18 +156,17 @@ void _refreshMapLayers() {
     List<Marker> stopMarkers = [];
     List<Marker> vehicleMarkers = [];
 
-    // --- 1. DATA PREP ---
     final tripToRouteIdMap = {for (var t in _trips) t.tripId: t.routeId};
     final routeTypeMap = {for (var r in _routes) r.routeId: r.routeType};
     final routeColorMap = {for (var r in _routes) r.routeId: r.routeColor};
-    // RESTORED: Headsign map
     final tripHeadsignMap = {for (var t in _trips) t.tripId: t.tripHeadsign};
+    final vehicleStatus = {for (var v in _vehiclePositions) v.id: v.vehicle.currentStatus};
+    final vehicleStop = {for (var v in _vehiclePositions) v.id: v.vehicle.stopId};
 
     final visibleTrips = _selectedRouteId == null
         ? _trips
         : _trips.where((t) => t.routeId == _selectedRouteId).toList();
 
-    // --- 2. BUILD POLYLINES ---
     for (var trip in visibleTrips) {
       if (trip.shapeId != null && _shapeCache.containsKey(trip.shapeId)) {
         final points = _shapeCache[trip.shapeId]!;
@@ -189,14 +188,12 @@ void _refreshMapLayers() {
       }
     }
 
-    // --- PREPARE VEHICLE DATA ---
     final visibleTripIds = visibleTrips.map((t) => t.tripId).toSet();
     final visibleVehicles = _vehiclePositions.where((v) {
       if (_selectedRouteId == null) return true;
       return visibleTripIds.contains(v.vehicle?.trip?.tripId);
     });
 
-    // --- 3. BUILD STOP MARKERS (Bottom Layer) ---
     if (_selectedVehicleId != null) {
       final selectedVehicle = visibleVehicles
           .cast<VehiclePositionEntity?>()
@@ -284,21 +281,19 @@ void _refreshMapLayers() {
       }
     }
 
-    // --- 4. BUILD VEHICLE MARKERS (Top Layer) ---
     for (var v in visibleVehicles) {
       final lat = v.vehicle?.position?.latitude;
       final lon = v.vehicle?.position?.longitude;
       final tripId = v.vehicle?.trip?.tripId;
       final vehicleId = v.id;
+      final status = vehicleStatus[vehicleId];
+      final stop = vehicleStop[vehicleId];
+      final stopDetails = _stopCache[stop];
 
       if (lat != null && lon != null && tripId != null) {
         final isSelected = _selectedVehicleId == vehicleId;
         final routeId = tripToRouteIdMap[tripId];
         final routeType = routeId != null ? routeTypeMap[routeId] : null;
-        
-        // Get Headsign (only show if route is selected, per previous request? 
-        // Or always show if selected? The prompt implies replacing the button 
-        // which only appears when selected.)
         final headsign = tripHeadsignMap[tripId] ?? "Unknown";
 
         IconData iconData;
@@ -323,7 +318,10 @@ void _refreshMapLayers() {
         if (isSelected) {
           markerContent = VehicleMarkerMenu(
             child: markerContent,
+            isBus: routeType == 0 || routeType == 2 ? false : true,
             headsign: headsign, // Passing headsign here
+            status: status,
+            stop: stopDetails!,
             onCompassPressed: () => debugPrint("Compass tapped for $vehicleId"),
             onWarningPressed: () => debugPrint("Warning tapped for $vehicleId"),
             onInfoPressed: () => debugPrint("Info tapped for $vehicleId"),
@@ -341,7 +339,6 @@ void _refreshMapLayers() {
           );
         }
 
-        // Expanded size to accommodate the menu + new text
         final double baseSize = isSelected ? 120.0 : 50.0;
         
         vehicleMarkers.add(

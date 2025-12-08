@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_octo_eureka/maps/gtfsApiService.dart';
@@ -217,15 +219,15 @@ class VehiclePinIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double whiteCircleSize = size * 0.6;  
-    final double innerIconSize = size * 0.4;   
-    final double topOffset = size * 0.1;        
+    final double whiteCircleSize = size * 0.6;
+    final double innerIconSize = size * 0.4;
+    final double topOffset = size * 0.1;
 
     return Stack(
       alignment: Alignment.topCenter,
       children: [
         Icon(
-          Icons.place, 
+          Icons.place,
           color: iconColor,
           size: size,
           shadows: [
@@ -250,11 +252,7 @@ class VehiclePinIcon extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
               ),
-              Icon(
-                vehicleIconData,
-                color: iconColor,
-                size: innerIconSize,
-              ),
+              Icon(vehicleIconData, color: iconColor, size: innerIconSize),
             ],
           ),
         ),
@@ -264,7 +262,10 @@ class VehiclePinIcon extends StatelessWidget {
 }
 
 class VehicleMarkerMenu extends StatelessWidget {
-  final Widget child; 
+  final Widget child;
+  final bool isBus;
+  final int? status;
+  final Stop stop;
   final String? headsign;
   final VoidCallback onCompassPressed;
   final VoidCallback onWarningPressed;
@@ -273,7 +274,10 @@ class VehicleMarkerMenu extends StatelessWidget {
   const VehicleMarkerMenu({
     super.key,
     required this.child,
+    required this.isBus,
     required this.headsign,
+    required this.status,
+    required this.stop,
     required this.onCompassPressed,
     required this.onWarningPressed,
     required this.onInfoPressed,
@@ -282,75 +286,126 @@ class VehicleMarkerMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const double buttonSize = 40.0;
-    
+    var statusString;
+    if (status == 0) {
+      statusString = "Arriving at";
+    } else if (status == 1) {
+      statusString = "Stopped at";
+    } else {
+      statusString = "In transit to";
+    }
+
     return Stack(
       alignment: Alignment.center,
-      clipBehavior: Clip.none, 
+      clipBehavior: Clip.none,
       children: [
+        // 1. The Vehicle Marker
         child,
 
-        // reorient the map to match the bearing of the vehicle 
+        // 2. The Floating Side Menu
         Positioned(
-          left: 0,
-          child: _buildMenuButton(
-            icon: Icons.explore,
-            color: Colors.black,
-            onTap: onCompassPressed,
-            size: buttonSize,
-          ),
-        ),
+          // CHANGE HERE:
+          // 'bottom: 0' made it grow up and cover the car.
+          // 'top: 50' pushes it down below the car.
+          // Adjust '50' to match the approximate height of your 'child' (marker icon).
+          top: 75,
 
-        // tap to show service alerts
-        Positioned(
-          top: 0,
-          child: _buildMenuButton(
-            icon: Icons.warning_amber_rounded,
-            color: Colors.orange,
-            onTap: onWarningPressed,
-            size: buttonSize,
-          ),
-        ),
-
-        // tap for vehicle info (status, capacity, headsign)
-        Positioned(
-          right: 0,
-          child: _buildMenuButton(
-            icon: Icons.info_outline,
-            color: Colors.teal,
-            onTap: onInfoPressed,
-            size: buttonSize,
-          ),
-        ),
-
-        Positioned(
-          bottom: 0,
-          child: headsign != null && headsign!.isNotEmpty ?
-          Container(
-            constraints: const BoxConstraints(maxWidth: 140),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Container(
+            padding: const EdgeInsets.all(8.0),
             decoration: BoxDecoration(
-              color: Colors.white, // White Background
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
-                  blurRadius: 2,
-                  offset: const Offset(0, 1),
-                )
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
               ],
             ),
-            child: Text(
-              headsign!,
-              style: const TextStyle(
-                color: Colors.black, // Black Text
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+                child: Container(
+                  color: Colors.white.withOpacity(0.3),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 8,
+                    horizontal: 4,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      headsign != null && headsign!.isNotEmpty
+                          ? Container(
+                              padding: const EdgeInsets.all(8.0),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16),
+                                // boxShadow: [
+                                //   BoxShadow(
+                                //     color: Colors.black.withOpacity(0.2),
+                                //     blurRadius: 10,
+                                //     offset: const Offset(0, 4),
+                                //   ),
+                                // ],
+                              ),
+                              child: Text(
+                                isBus ? "${headsign!} bus" : "${headsign!} train",
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            )
+                          : SizedBox(),
+                      Text(statusString,  style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                ),
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,),
+                      stop.stopName != "" ? Text(stop.stopName,  style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                ),
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,) : SizedBox(),
+                      Row(
+                        children: [
+                          _buildMenuButton(
+                            icon: Icons.warning_amber_rounded,
+                            color: Colors.orange,
+                            onTap: onWarningPressed,
+                            size: buttonSize,
+                          ),
+                          const SizedBox(height: 8),
+                          _buildMenuButton(
+                            icon: Icons.info_outline,
+                            color: Colors.teal,
+                            onTap: onInfoPressed,
+                            size: buttonSize,
+                          ),
+                          const SizedBox(height: 8),
+                          _buildMenuButton(
+                            icon: Icons.explore,
+                            color: Colors.black,
+                            onTap: onCompassPressed,
+                            size: buttonSize,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              textAlign: TextAlign.center,
-              maxLines: 2, // Allow 2 lines for long destinations
-              overflow: TextOverflow.ellipsis,
             ),
-          ) : Container(),)
+          ),
+        ),
       ],
     );
   }
@@ -364,14 +419,16 @@ class VehicleMarkerMenu extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: size,
-        height: size,
+        padding: const EdgeInsets.all(8.0),
         decoration: BoxDecoration(
-          color: Colors.white,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(blurRadius: 4, color: Colors.black26, offset: Offset(0, 2))
-          ],
+          borderRadius: BorderRadius.circular(16),
+          // boxShadow: [
+          //   BoxShadow(
+          //     color: Colors.black.withOpacity(0.2),
+          //     blurRadius: 10,
+          //     offset: const Offset(0, 4),
+          //   ),
+          // ],
         ),
         child: Icon(icon, color: color, size: 24),
       ),

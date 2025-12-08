@@ -55,12 +55,12 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
 
   Future<void> _fetchVehiclePositionsData({bool isBackground = false}) async {
     if (!isBackground) {
-      setState(() => _isLoading = true);
+      setState(() => _isLoading = true); //
     }
     try {
       final positions = await mapService.loadVehiclePositions();
       if (positions.isEmpty) {
-        if (!isBackground && mounted) setState(() => _isLoading = false);
+        if (!isBackground && mounted) setState(() => _isLoading = false); //
         return;
       }
       final results = await Future.wait([
@@ -219,22 +219,22 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
           size: 45.0,
         );
 
-        // WRAPPER: If selected, wrap in the menu
         if (isSelected) {
           markerContent = VehicleMarkerMenu(
-            child: markerContent,
+            child: markerContent, // possibly replace w marker that is expanded to show trip headsign and current status??? hero style?
             onCompassPressed: () => debugPrint("Compass tapped for $vehicleId"),
             onWarningPressed: () => debugPrint("Warning tapped for $vehicleId"),
             onInfoPressed: () => debugPrint("Info tapped for $vehicleId"),
             onStopsPressed: () => debugPrint("List stops tapped for $vehicleId"),
           );
         } else {
-          // If not selected, wrap in GestureDetector to handle the selection tap
           markerContent = GestureDetector(
             onTap: () {
               setState(() {
+                // add function to reposition map to center over this marker
+                _selectedRouteId = routeId;
                 _selectedVehicleId = vehicleId;
-                _refreshMapLayers(); // Rebuild to expand this marker
+                _refreshMapLayers(); 
               });
             },
             child: markerContent,
@@ -247,7 +247,7 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
             width: markerSize,
             height: markerSize,
             alignment: Alignment
-                .center, // Important: Keep center alignment so expansion is even
+                .center,
             child: markerContent,
           ),
         );
@@ -293,6 +293,7 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
               onTap: (tapPosition, point) {
                 if (_selectedVehicleId != null) {
                   setState(() {
+                    _selectedRouteId = null;
                     _selectedVehicleId = null;
                     _refreshMapLayers();
                   });

@@ -148,27 +148,35 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
     await Future.wait([shapeLoadFuture, stopLoadFuture]);
   }
 
-  void _refreshMapLayers() {
+void _refreshMapLayers() {
     if (!mounted) return;
     List<Polyline> newPolylines = [];
-    List<Marker> newMarkers = [];
+    
+    // Z-Index control: Stops on bottom, Vehicles on top
+    List<Marker> stopMarkers = [];
+    List<Marker> vehicleMarkers = [];
+
+    // --- 1. DATA PREP ---
     final tripToRouteIdMap = {for (var t in _trips) t.tripId: t.routeId};
     final routeTypeMap = {for (var r in _routes) r.routeId: r.routeType};
     final routeColorMap = {for (var r in _routes) r.routeId: r.routeColor};
+    // RESTORED: Headsign map
+    final tripHeadsignMap = {for (var t in _trips) t.tripId: t.tripHeadsign};
+
     final visibleTrips = _selectedRouteId == null
         ? _trips
         : _trips.where((t) => t.routeId == _selectedRouteId).toList();
+
+    // --- 2. BUILD POLYLINES ---
     for (var trip in visibleTrips) {
       if (trip.shapeId != null && _shapeCache.containsKey(trip.shapeId)) {
         final points = _shapeCache[trip.shapeId]!;
         final routeId = trip.routeId;
         final colorHex = routeId != null ? routeColorMap[routeId] : null;
-        Color polylineColor;
-        if (colorHex != null && colorHex.isNotEmpty) {
-          polylineColor = _colorFromHex(colorHex);
-        } else {
-          polylineColor = Colors.grey;
-        }
+        Color polylineColor = (colorHex != null && colorHex.isNotEmpty)
+            ? _colorFromHex(colorHex)
+            : Colors.grey;
+
         newPolylines.add(
           Polyline(
             points: points
@@ -180,37 +188,130 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
         );
       }
     }
+
+    // --- PREPARE VEHICLE DATA ---
     final visibleTripIds = visibleTrips.map((t) => t.tripId).toSet();
     final visibleVehicles = _vehiclePositions.where((v) {
       if (_selectedRouteId == null) return true;
       return visibleTripIds.contains(v.vehicle?.trip?.tripId);
     });
 
+    // --- 3. BUILD STOP MARKERS (Bottom Layer) ---
+    if (_selectedVehicleId != null) {
+      final selectedVehicle = visibleVehicles
+          .cast<VehiclePositionEntity?>()
+          .firstWhere(
+            (v) => v?.id == _selectedVehicleId,
+            orElse: () => null,
+          );
+
+      final specificTripId = selectedVehicle?.vehicle?.trip?.tripId;
+      
+      Color routeColor = Colors.grey;
+      if (selectedVehicle != null) {
+         final tripId = selectedVehicle.vehicle?.trip?.tripId;
+         final routeId = tripToRouteIdMap[tripId];
+         final colorHex = routeId != null ? routeColorMap[routeId] : null;
+         if (colorHex != null && colorHex.isNotEmpty) {
+           routeColor = _colorFromHex(colorHex);
+         }
+      }
+
+      if (specificTripId != null && _stopTimeCache.containsKey(specificTripId)) {
+        final stopTimes = _stopTimeCache[specificTripId]!;
+        
+        for (final stopTime in stopTimes) {
+          final stopId = stopTime.stopId;
+          
+          if (stopId != null && _stopCache.containsKey(stopId)) {
+            final stop = _stopCache[stopId]!;
+            
+            stopMarkers.add(
+              Marker(
+                point: LatLng(stop.stopLat, stop.stopLon),
+                width: 150.0, 
+                height: 80.0, 
+                alignment: Alignment.center, 
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(6),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.3),
+                            blurRadius: 2,
+                            offset: const Offset(0, 1),
+                          )
+                        ],
+                      ),
+                      child: Text(
+                        stop.stopName,
+                        style: const TextStyle(
+                          color: Colors.black,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: routeColor, width: 2),
+                      ),
+                      child: Icon(
+                        Icons.nature_people,
+                        size: 14,
+                        color: routeColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+        }
+      }
+    }
+
+    // --- 4. BUILD VEHICLE MARKERS (Top Layer) ---
     for (var v in visibleVehicles) {
       final lat = v.vehicle?.position?.latitude;
       final lon = v.vehicle?.position?.longitude;
       final tripId = v.vehicle?.trip?.tripId;
       final vehicleId = v.id;
+
       if (lat != null && lon != null && tripId != null) {
         final isSelected = _selectedVehicleId == vehicleId;
-        final double markerSize = isSelected ? 160.0 : 50.0;
         final routeId = tripToRouteIdMap[tripId];
         final routeType = routeId != null ? routeTypeMap[routeId] : null;
+        
+        // Get Headsign (only show if route is selected, per previous request? 
+        // Or always show if selected? The prompt implies replacing the button 
+        // which only appears when selected.)
+        final headsign = tripHeadsignMap[tripId] ?? "Unknown";
+
         IconData iconData;
         Color iconColor;
         final colorHex = routeId != null ? routeColorMap[routeId] : null;
-        if (colorHex != null && colorHex.isNotEmpty) {
-          iconColor = _colorFromHex(colorHex);
-        } else {
-          iconColor = Colors.grey;
-        }
+        iconColor = (colorHex != null && colorHex.isNotEmpty)
+            ? _colorFromHex(colorHex)
+            : Colors.grey;
+
         if (routeType == 0 || routeType == 2) {
           iconData = Icons.train;
-        } else if (routeType == 3) {
-          iconData = Icons.directions_bus;
         } else {
           iconData = Icons.directions_bus;
-          iconColor = Colors.grey;
         }
 
         Widget markerContent = VehiclePinIcon(
@@ -221,41 +322,43 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
 
         if (isSelected) {
           markerContent = VehicleMarkerMenu(
-            child: markerContent, // possibly replace w marker that is expanded to show trip headsign and current status??? hero style?
+            child: markerContent,
+            headsign: headsign, // Passing headsign here
             onCompassPressed: () => debugPrint("Compass tapped for $vehicleId"),
             onWarningPressed: () => debugPrint("Warning tapped for $vehicleId"),
             onInfoPressed: () => debugPrint("Info tapped for $vehicleId"),
-            onStopsPressed: () => debugPrint("List stops tapped for $vehicleId"),
           );
         } else {
           markerContent = GestureDetector(
             onTap: () {
               setState(() {
-                // add function to reposition map to center over this marker
                 _selectedRouteId = routeId;
                 _selectedVehicleId = vehicleId;
-                _refreshMapLayers(); 
+                _refreshMapLayers();
               });
             },
             child: markerContent,
           );
         }
 
-        newMarkers.add(
+        // Expanded size to accommodate the menu + new text
+        final double baseSize = isSelected ? 120.0 : 50.0;
+        
+        vehicleMarkers.add(
           Marker(
             point: LatLng(lat, lon),
-            width: markerSize,
-            height: markerSize,
-            alignment: Alignment
-                .center,
+            width: baseSize,
+            height: baseSize,
+            alignment: Alignment.center,
             child: markerContent,
           ),
         );
       }
     }
+
     setState(() {
       _activePolylines = newPolylines;
-      _activeMarkers = newMarkers;
+      _activeMarkers = [...stopMarkers, ...vehicleMarkers];
     });
   }
 

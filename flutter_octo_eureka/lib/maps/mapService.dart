@@ -264,19 +264,19 @@ class VehiclePinIcon extends StatelessWidget {
 }
 
 class VehicleMarkerMenu extends StatelessWidget {
-  final Widget child; // The original VehiclePinIcon
+  final Widget child; 
+  final String? headsign;
   final VoidCallback onCompassPressed;
   final VoidCallback onWarningPressed;
   final VoidCallback onInfoPressed;
-  final VoidCallback onStopsPressed;
 
   const VehicleMarkerMenu({
     super.key,
     required this.child,
+    required this.headsign,
     required this.onCompassPressed,
     required this.onWarningPressed,
     required this.onInfoPressed,
-    required this.onStopsPressed
   });
 
   @override
@@ -324,13 +324,33 @@ class VehicleMarkerMenu extends StatelessWidget {
 
         Positioned(
           bottom: 0,
-          child: _buildMenuButton(
-            icon: Icons.list_outlined,
-            color: Colors.red,
-            onTap: onStopsPressed,
-            size: buttonSize,
-          ),
-        ),
+          child: headsign != null && headsign!.isNotEmpty ?
+          Container(
+            constraints: const BoxConstraints(maxWidth: 140),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white, // White Background
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 2,
+                  offset: const Offset(0, 1),
+                )
+              ],
+            ),
+            child: Text(
+              headsign!,
+              style: const TextStyle(
+                color: Colors.black, // Black Text
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2, // Allow 2 lines for long destinations
+              overflow: TextOverflow.ellipsis,
+            ),
+          ) : Container(),)
       ],
     );
   }

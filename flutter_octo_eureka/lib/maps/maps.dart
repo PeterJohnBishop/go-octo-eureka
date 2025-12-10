@@ -153,8 +153,6 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
   void _refreshMapLayers() {
     if (!mounted) return;
     List<Polyline> newPolylines = [];
-
-    // Z-Index control: Stops on bottom, Vehicles on top
     List<Marker> stopMarkers = [];
     List<Marker> vehicleMarkers = [];
 
@@ -336,7 +334,9 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
       final bearing = v.vehicle.position.bearing;
       final double bearingRadians = bearing! * (pi / 180);
       final unixTimestamp = v.vehicle.timestamp;
-      final DateTime date = DateTime.fromMillisecondsSinceEpoch(unixTimestamp * 1000);
+      final DateTime date = DateTime.fromMillisecondsSinceEpoch(
+        unixTimestamp * 1000,
+      );
       final String formattedTime = DateFormat('h:mm a').format(date);
       final tripId = v.vehicle?.trip?.tripId;
       final vehicleId = v.id;
@@ -373,7 +373,7 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
           markerContent = VehicleMarkerMenu(
             child: markerContent,
             isBus: routeType == 0 || routeType == 2 ? false : true,
-            headsign: headsign, 
+            headsign: headsign,
             timestamp: formattedTime,
             status: status,
             stop: stopDetails!,
@@ -427,27 +427,27 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
   }
 
   String formatGtfsTime(String time24) {
-            if (time24.isEmpty) return "";
+    if (time24.isEmpty) return "";
 
-            // Split "23:01:00" into ["23", "01", "00"]
-            final parts = time24.split(':');
-            if (parts.length < 2) return time24; 
-            int hours = int.tryParse(parts[0]) ?? 0;
-            final String minutes = parts[1];
+    // Split "23:01:00" into ["23", "01", "00"]
+    final parts = time24.split(':');
+    if (parts.length < 2) return time24;
+    int hours = int.tryParse(parts[0]) ?? 0;
+    final String minutes = parts[1];
 
-            // Handle GTFS 24+ times (like 25:00 = 1:00 AM)
-            hours = hours % 24;
+    // Handle GTFS 24+ times (like 25:00 = 1:00 AM)
+    hours = hours % 24;
 
-            // Determine AM or PM
-            final String period = hours >= 12 ? 'PM' : 'AM';
+    // Determine AM or PM
+    final String period = hours >= 12 ? 'PM' : 'AM';
 
-            // Convert 24h to 12h
-            hours = hours % 12;
-            // If hours is 0 (midnight or noon), show as 12
-            if (hours == 0) hours = 12;
+    // Convert 24h to 12h
+    hours = hours % 12;
+    // If hours is 0 (midnight or noon), show as 12
+    if (hours == 0) hours = 12;
 
-            return "$hours:$minutes $period";
-          }
+    return "$hours:$minutes $period";
+  }
 
   void _startAutoRefresh() {
     _updateTimer = Timer.periodic(const Duration(minutes: 2), (timer) {
@@ -505,36 +505,55 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
                   padding: const EdgeInsets.all(8.0),
                   child: Card(
                     elevation: 4,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12.0,
-                        vertical: 4.0,
-                      ),
-                      child: DropdownButton<String>(
-                        isExpanded: true,
-                        hint: const Text("Select Route"),
-                        value: _selectedRouteId,
-                        items: _routeMenuItems,
-                        underline: Container(),
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedRouteId = value;
-                            _refreshMapLayers();
-                          });
-                        },
-                      ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12.0,
+                              vertical: 4.0,
+                            ),
+                            child: DropdownButton<String>(
+                              isExpanded: true,
+                              hint: const Text("Select Route"),
+                              value: _selectedRouteId,
+                              items: _routeMenuItems,
+                              underline: Container(),
+                              onChanged: (value) {
+                                setState(() {
+                                  _selectedRouteId = value;
+                                  _refreshMapLayers();
+                                });
+                              },
+                            ),
+                          ),
+                        ),
+
+                        Container(
+                          width: 1,
+                          height: 32,
+                          color: Colors.grey.shade300,
+                        ),
+
+                        _isLoading ? Padding(
+                          padding: EdgeInsets.all(8),
+                          child: CircularProgressIndicator()) : IconButton(
+                          icon: const Icon(Icons.refresh),
+                          color: Colors.grey[700],
+                          tooltip: 'Refresh Routes',
+                          onPressed: () {
+                            setState(() {
+                              _fetchVehiclePositionsData(isBackground: false);
+                            });
+                          },
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ],
             ),
           ),
-
-          if (_isLoading)
-            Container(
-              color: Colors.black26,
-              child: const Center(child: CircularProgressIndicator()),
-            ),
         ],
       ),
     );

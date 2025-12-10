@@ -223,53 +223,52 @@ class VehiclePinIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final double whiteCircleSize = size * 0.6;
     final double innerIconSize = size * 0.4;
-    final double topOffset = size * 0.1;
 
-    return 
-        Transform.rotate(
-          angle: bearing,
-          child: Stack(
-            alignment: Alignment.bottomCenter,
-            children: [
-              Padding(
-                padding: EdgeInsets.only(top: topOffset),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Container(
-                      width: whiteCircleSize,
-                      height: whiteCircleSize,
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    Icon(
-                      vehicleIconData,
-                      color: iconColor,
-                      size: innerIconSize,
-                    ),
-                  ],
-                ),
+    // Adjust this to push the arrow further out or pull it in
+    final double arrowVerticalShift = -size * 0.25;
+
+    return Transform.rotate(
+      angle: bearing,
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: Stack(
+          alignment: Alignment.center,
+          clipBehavior: Clip.none,
+          children: [
+            Transform.translate(
+              offset: Offset(0, arrowVerticalShift),
+              child: Icon(
+                Icons.keyboard_arrow_up_sharp,
+                color: Colors.red,
+                size: size,
+                shadows: [
+                  Shadow(
+                    blurRadius: 2.0,
+                    color: Colors.black.withOpacity(0.3),
+                    offset: const Offset(0, 1),
+                  ),
+                ],
               ),
-              Positioned(
-                top: 0,
-                child: Icon(
-                  Icons.keyboard_arrow_up_sharp,
-                  color: iconColor,
-                  size: size,
-                  shadows: [
-                    Shadow(
-                      blurRadius: 2.0,
-                      color: Colors.black.withOpacity(0.3),
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
+            ),
+            Container(
+              width: whiteCircleSize,
+              height: whiteCircleSize,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
               ),
-            ],
-          ),
-        );;
+              alignment: Alignment.center,
+              child: Icon(
+                vehicleIconData,
+                color: iconColor,
+                size: innerIconSize,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -279,6 +278,7 @@ class VehicleMarkerMenu extends StatelessWidget {
   final int? status;
   final Stop stop;
   final String? headsign;
+  final String? timestamp;
   final VoidCallback onCompassPressed;
   final VoidCallback onWarningPressed;
   final VoidCallback onInfoPressed;
@@ -288,6 +288,7 @@ class VehicleMarkerMenu extends StatelessWidget {
     required this.child,
     required this.isBus,
     required this.headsign,
+    required this.timestamp,
     required this.status,
     required this.stop,
     required this.onCompassPressed,
@@ -321,7 +322,7 @@ class VehicleMarkerMenu extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
+                  color: Colors.black.withValues(alpha: .2),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -332,7 +333,7 @@ class VehicleMarkerMenu extends StatelessWidget {
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
                 child: Container(
-                  color: Colors.white.withOpacity(0.3),
+                  color: Colors.white.withValues(alpha: 0.4),
                   padding: const EdgeInsets.symmetric(
                     vertical: 8,
                     horizontal: 4,
@@ -351,8 +352,8 @@ class VehicleMarkerMenu extends StatelessWidget {
                                     ? "${headsign!} bus"
                                     : "${headsign!} train",
                                 style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
+                                  color: Colors.black,
+                                  fontSize: 14,
                                   fontWeight: FontWeight.bold,
                                 ),
                                 textAlign: TextAlign.center,
@@ -364,8 +365,8 @@ class VehicleMarkerMenu extends StatelessWidget {
                       Text(
                         statusString,
                         style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
+                          color: Colors.black,
+                          fontSize: 12,
                         ),
                         textAlign: TextAlign.center,
                         maxLines: 2,
@@ -375,14 +376,24 @@ class VehicleMarkerMenu extends StatelessWidget {
                           ? Text(
                               stop.stopName,
                               style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
+                                color: Colors.black,
+                                fontSize: 12,
                               ),
                               textAlign: TextAlign.center,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             )
                           : SizedBox(),
+                      Text(
+                        "Status updated at ${timestamp}",
+                        style: const TextStyle(
+                          color: Colors.black,
+                          fontSize: 10,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       Row(
                         children: [
                           _buildMenuButton(

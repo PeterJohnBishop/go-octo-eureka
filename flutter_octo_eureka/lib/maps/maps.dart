@@ -7,7 +7,7 @@ import 'package:flutter_octo_eureka/maps/mapService.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_octo_eureka/maps/gtfsTypes.dart';
 import 'package:url_launcher/url_launcher.dart';
-
+import 'package:intl/intl.dart';
 
 class BaseMapWidget extends StatefulWidget {
   const BaseMapWidget({super.key});
@@ -150,10 +150,10 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
     await Future.wait([shapeLoadFuture, stopLoadFuture]);
   }
 
-void _refreshMapLayers() {
+  void _refreshMapLayers() {
     if (!mounted) return;
     List<Polyline> newPolylines = [];
-    
+
     // Z-Index control: Stops on bottom, Vehicles on top
     List<Marker> stopMarkers = [];
     List<Marker> vehicleMarkers = [];
@@ -162,8 +162,12 @@ void _refreshMapLayers() {
     final routeTypeMap = {for (var r in _routes) r.routeId: r.routeType};
     final routeColorMap = {for (var r in _routes) r.routeId: r.routeColor};
     final tripHeadsignMap = {for (var t in _trips) t.tripId: t.tripHeadsign};
-    final vehicleStatus = {for (var v in _vehiclePositions) v.id: v.vehicle.currentStatus};
-    final vehicleStop = {for (var v in _vehiclePositions) v.id: v.vehicle.stopId};
+    final vehicleStatus = {
+      for (var v in _vehiclePositions) v.id: v.vehicle.currentStatus,
+    };
+    final vehicleStop = {
+      for (var v in _vehiclePositions) v.id: v.vehicle.stopId,
+    };
 
     final visibleTrips = _selectedRouteId == null
         ? _trips
@@ -199,43 +203,49 @@ void _refreshMapLayers() {
     if (_selectedVehicleId != null) {
       final selectedVehicle = visibleVehicles
           .cast<VehiclePositionEntity?>()
-          .firstWhere(
-            (v) => v?.id == _selectedVehicleId,
-            orElse: () => null,
-          );
+          .firstWhere((v) => v?.id == _selectedVehicleId, orElse: () => null);
 
       final specificTripId = selectedVehicle?.vehicle?.trip?.tripId;
-      
+
       Color routeColor = Colors.grey;
       if (selectedVehicle != null) {
-         final tripId = selectedVehicle.vehicle?.trip?.tripId;
-         final routeId = tripToRouteIdMap[tripId];
-         final colorHex = routeId != null ? routeColorMap[routeId] : null;
-         if (colorHex != null && colorHex.isNotEmpty) {
-           routeColor = _colorFromHex(colorHex);
-         }
+        final tripId = selectedVehicle.vehicle?.trip?.tripId;
+        final routeId = tripToRouteIdMap[tripId];
+        final colorHex = routeId != null ? routeColorMap[routeId] : null;
+        if (colorHex != null && colorHex.isNotEmpty) {
+          routeColor = _colorFromHex(colorHex);
+        }
       }
 
-      if (specificTripId != null && _stopTimeCache.containsKey(specificTripId)) {
+      if (specificTripId != null &&
+          _stopTimeCache.containsKey(specificTripId)) {
         final stopTimes = _stopTimeCache[specificTripId]!;
-        
+
         for (final stopTime in stopTimes) {
+          final arrival = stopTime.arrivalTime;
+          final departure = stopTime.departureTime;
           final stopId = stopTime.stopId;
-          
+
+          final convertedArrival = formatGtfsTime(arrival);
+          final convertedDeparture = formatGtfsTime(departure);
+
           if (stopId != null && _stopCache.containsKey(stopId)) {
             final stop = _stopCache[stopId]!;
-            
+
             stopMarkers.add(
               Marker(
                 point: LatLng(stop.stopLat, stop.stopLon),
-                width: 150.0, 
-                height: 80.0, 
-                alignment: Alignment.center, 
+                width: 200.0,
+                height: 90.0,
+                alignment: Alignment.center,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(6),
@@ -244,19 +254,56 @@ void _refreshMapLayers() {
                             color: Colors.black.withOpacity(0.3),
                             blurRadius: 2,
                             offset: const Offset(0, 1),
-                          )
+                          ),
                         ],
                       ),
-                      child: Text(
-                        stop.stopName,
-                        style: const TextStyle(
-                          color: Colors.black,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      child: Column(
+                        children: [
+                          Text(
+                            stop.stopName,
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            "Scheduled",
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            "arrival: ${convertedArrival},",
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            "departure: ${convertedDeparture}",
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -288,6 +335,9 @@ void _refreshMapLayers() {
       final lon = v.vehicle?.position?.longitude;
       final bearing = v.vehicle.position.bearing;
       final double bearingRadians = bearing! * (pi / 180);
+      final unixTimestamp = v.vehicle.timestamp;
+      final DateTime date = DateTime.fromMillisecondsSinceEpoch(unixTimestamp * 1000);
+      final String formattedTime = DateFormat('h:mm a').format(date);
       final tripId = v.vehicle?.trip?.tripId;
       final vehicleId = v.id;
       final status = vehicleStatus[vehicleId];
@@ -299,7 +349,6 @@ void _refreshMapLayers() {
         final routeId = tripToRouteIdMap[tripId];
         final routeType = routeId != null ? routeTypeMap[routeId] : null;
         final headsign = tripHeadsignMap[tripId] ?? "Unknown";
-
         IconData iconData;
         Color iconColor;
         final colorHex = routeId != null ? routeColorMap[routeId] : null;
@@ -324,7 +373,8 @@ void _refreshMapLayers() {
           markerContent = VehicleMarkerMenu(
             child: markerContent,
             isBus: routeType == 0 || routeType == 2 ? false : true,
-            headsign: headsign, // Passing headsign here
+            headsign: headsign, 
+            timestamp: formattedTime,
             status: status,
             stop: stopDetails!,
             onCompassPressed: () => debugPrint("Compass tapped for $vehicleId"),
@@ -345,7 +395,7 @@ void _refreshMapLayers() {
         }
 
         final double baseSize = isSelected ? 120.0 : 50.0;
-        
+
         vehicleMarkers.add(
           Marker(
             point: LatLng(lat, lon),
@@ -375,6 +425,29 @@ void _refreshMapLayers() {
       return Colors.blue;
     }
   }
+
+  String formatGtfsTime(String time24) {
+            if (time24.isEmpty) return "";
+
+            // Split "23:01:00" into ["23", "01", "00"]
+            final parts = time24.split(':');
+            if (parts.length < 2) return time24; 
+            int hours = int.tryParse(parts[0]) ?? 0;
+            final String minutes = parts[1];
+
+            // Handle GTFS 24+ times (like 25:00 = 1:00 AM)
+            hours = hours % 24;
+
+            // Determine AM or PM
+            final String period = hours >= 12 ? 'PM' : 'AM';
+
+            // Convert 24h to 12h
+            hours = hours % 12;
+            // If hours is 0 (midnight or noon), show as 12
+            if (hours == 0) hours = 12;
+
+            return "$hours:$minutes $period";
+          }
 
   void _startAutoRefresh() {
     _updateTimer = Timer.periodic(const Duration(minutes: 2), (timer) {
@@ -412,15 +485,16 @@ void _refreshMapLayers() {
               ),
               PolylineLayer(polylines: _activePolylines),
               MarkerLayer(markers: _activeMarkers),
-               RichAttributionWidget(
-    attributions: [
-      // Suggested attribution for the OpenStreetMap public tile server
-      TextSourceAttribution(
-        'OpenStreetMap contributors',
-        onTap: () => launchUrl(Uri.parse('https://openstreetmap.org/copyright')),
-      ),
-    ],
-  ),
+              RichAttributionWidget(
+                attributions: [
+                  TextSourceAttribution(
+                    'OpenStreetMap contributors',
+                    onTap: () => launchUrl(
+                      Uri.parse('https://openstreetmap.org/copyright'),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
 

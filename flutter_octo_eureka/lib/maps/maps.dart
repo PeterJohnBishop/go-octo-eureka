@@ -6,6 +6,8 @@ import 'package:flutter_octo_eureka/maps/gtfsApiService.dart';
 import 'package:flutter_octo_eureka/maps/mapService.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_octo_eureka/maps/gtfsTypes.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 
 class BaseMapWidget extends StatefulWidget {
   const BaseMapWidget({super.key});
@@ -284,6 +286,8 @@ void _refreshMapLayers() {
     for (var v in visibleVehicles) {
       final lat = v.vehicle?.position?.latitude;
       final lon = v.vehicle?.position?.longitude;
+      final bearing = v.vehicle.position.bearing;
+      final double bearingRadians = bearing! * (pi / 180);
       final tripId = v.vehicle?.trip?.tripId;
       final vehicleId = v.id;
       final status = vehicleStatus[vehicleId];
@@ -313,6 +317,7 @@ void _refreshMapLayers() {
           iconColor: iconColor,
           vehicleIconData: iconData,
           size: 45.0,
+          bearing: bearingRadians,
         );
 
         if (isSelected) {
@@ -407,6 +412,15 @@ void _refreshMapLayers() {
               ),
               PolylineLayer(polylines: _activePolylines),
               MarkerLayer(markers: _activeMarkers),
+               RichAttributionWidget(
+    attributions: [
+      // Suggested attribution for the OpenStreetMap public tile server
+      TextSourceAttribution(
+        'OpenStreetMap contributors',
+        onTap: () => launchUrl(Uri.parse('https://openstreetmap.org/copyright')),
+      ),
+    ],
+  ),
             ],
           ),
 

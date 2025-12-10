@@ -1,9 +1,16 @@
-Init
+Data Loading 
 
-User location? 
-Bus or Train? 
-Route?
+- When the app starts, vehicle position data is requested from RTD's GTFS-RT feed to get, and loaded into memory
+    + trip_id
+    + route_id
+    + position 
+    + status
 
+-  Server side, data files are read, arrays of objects are created in memory, then that data is mapped by id when the server is initialized.
+
+- trip_id is extracted from each Vehicle, compiled into a set, and requested in bulk concurrently
+- route_id is extracted from each Vehicle, compiled into a set, and requested in bulk concurrently
+- for each trip, stoo, stop time, and shape are requested to complete the picture. 
 
 
 Vehicle Positions[] | Find all of the vehicles currently running

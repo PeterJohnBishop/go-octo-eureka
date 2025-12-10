@@ -209,12 +209,14 @@ class VehiclePinIcon extends StatelessWidget {
   final Color iconColor;
   final IconData vehicleIconData;
   final double size;
+  final double bearing;
 
   const VehiclePinIcon({
     Key? key,
     required this.iconColor,
     required this.vehicleIconData,
     this.size = 40.0,
+    required this.bearing,
   }) : super(key: key);
 
   @override
@@ -223,41 +225,51 @@ class VehiclePinIcon extends StatelessWidget {
     final double innerIconSize = size * 0.4;
     final double topOffset = size * 0.1;
 
-    return Stack(
-      alignment: Alignment.topCenter,
-      children: [
-        Icon(
-          Icons.place,
-          color: iconColor,
-          size: size,
-          shadows: [
-            Shadow(
-              blurRadius: 2.0,
-              color: Colors.black.withOpacity(0.3),
-              offset: const Offset(0, 1),
-            ),
-          ],
-        ),
-
-        Padding(
-          padding: EdgeInsets.only(top: topOffset),
+    return 
+        Transform.rotate(
+          angle: bearing,
           child: Stack(
-            alignment: Alignment.center,
+            alignment: Alignment.bottomCenter,
             children: [
-              Container(
-                width: whiteCircleSize,
-                height: whiteCircleSize,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
+              Padding(
+                padding: EdgeInsets.only(top: topOffset),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: whiteCircleSize,
+                      height: whiteCircleSize,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    Icon(
+                      vehicleIconData,
+                      color: iconColor,
+                      size: innerIconSize,
+                    ),
+                  ],
                 ),
               ),
-              Icon(vehicleIconData, color: iconColor, size: innerIconSize),
+              Positioned(
+                top: 0,
+                child: Icon(
+                  Icons.keyboard_arrow_up_sharp,
+                  color: iconColor,
+                  size: size,
+                  shadows: [
+                    Shadow(
+                      blurRadius: 2.0,
+                      color: Colors.black.withOpacity(0.3),
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
-        ),
-      ],
-    );
+        );;
   }
 }
 
@@ -299,15 +311,8 @@ class VehicleMarkerMenu extends StatelessWidget {
       alignment: Alignment.center,
       clipBehavior: Clip.none,
       children: [
-        // 1. The Vehicle Marker
         child,
-
-        // 2. The Floating Side Menu
         Positioned(
-          // CHANGE HERE:
-          // 'bottom: 0' made it grow up and cover the car.
-          // 'top: 50' pushes it down below the car.
-          // Adjust '50' to match the approximate height of your 'child' (marker icon).
           top: 75,
 
           child: Container(
@@ -340,16 +345,11 @@ class VehicleMarkerMenu extends StatelessWidget {
                               padding: const EdgeInsets.all(8.0),
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(16),
-                                // boxShadow: [
-                                //   BoxShadow(
-                                //     color: Colors.black.withOpacity(0.2),
-                                //     blurRadius: 10,
-                                //     offset: const Offset(0, 4),
-                                //   ),
-                                // ],
                               ),
                               child: Text(
-                                isBus ? "${headsign!} bus" : "${headsign!} train",
+                                isBus
+                                    ? "${headsign!} bus"
+                                    : "${headsign!} train",
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 12,
@@ -361,20 +361,28 @@ class VehicleMarkerMenu extends StatelessWidget {
                               ),
                             )
                           : SizedBox(),
-                      Text(statusString,  style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                ),
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,),
-                      stop.stopName != "" ? Text(stop.stopName,  style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                ),
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,) : SizedBox(),
+                      Text(
+                        statusString,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      stop.stopName != ""
+                          ? Text(
+                              stop.stopName,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                              ),
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            )
+                          : SizedBox(),
                       Row(
                         children: [
                           _buildMenuButton(
@@ -420,16 +428,7 @@ class VehicleMarkerMenu extends StatelessWidget {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(8.0),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          // boxShadow: [
-          //   BoxShadow(
-          //     color: Colors.black.withOpacity(0.2),
-          //     blurRadius: 10,
-          //     offset: const Offset(0, 4),
-          //   ),
-          // ],
-        ),
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(16)),
         child: Icon(icon, color: color, size: 24),
       ),
     );

@@ -17,7 +17,7 @@ import (
 
 func ServeGin() {
 
-	port := os.Getenv("GIN_PORT")
+	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}

@@ -3,7 +3,6 @@ package processing
 import (
 	"encoding/csv"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -18,16 +17,27 @@ var TripData []Trip
 
 func OpenFile(fileName string) ([][]string, error) {
 
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		log.Fatal(err)
+	basePath := os.Getenv("APP_HOME")
+	if basePath == "" {
+		basePath = "."
 	}
-	inputUrl := filepath.Join(homeDir, "Development", "go-octo-eureka", "server", "processing", "input")
-	file, err := os.Open(inputUrl + "/" + fileName)
+	inputUrl := filepath.Join(basePath, "/server/processing", "input")
+
+	file, err := os.Open(filepath.Join(inputUrl, fileName))
 	if err != nil {
 		fmt.Println("Error opening file:", err)
 		return nil, err
 	}
+	// homeDir, err := os.UserHomeDir()
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// inputUrl := filepath.Join(homeDir, "Development", "go-octo-eureka", "server", "processing", "input")
+	// file, err := os.Open(inputUrl + "/" + fileName)
+	// if err != nil {
+	// 	fmt.Println("Error opening file:", err)
+	// 	return nil, err
+	// }
 	defer file.Close()
 
 	reader := csv.NewReader(file)

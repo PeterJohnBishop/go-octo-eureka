@@ -172,10 +172,10 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
         : _trips.where((t) => t.routeId == _selectedRouteId).toList();
 
     for (var trip in visibleTrips) {
-      if (trip.shapeId != null && _shapeCache.containsKey(trip.shapeId)) {
+      if (_shapeCache.containsKey(trip.shapeId)) {
         final points = _shapeCache[trip.shapeId]!;
         final routeId = trip.routeId;
-        final colorHex = routeId != null ? routeColorMap[routeId] : null;
+        final colorHex = routeColorMap[routeId];
         Color polylineColor = (colorHex != null && colorHex.isNotEmpty)
             ? _colorFromHex(colorHex)
             : Colors.grey;
@@ -195,7 +195,7 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
     final visibleTripIds = visibleTrips.map((t) => t.tripId).toSet();
     final visibleVehicles = _vehiclePositions.where((v) {
       if (_selectedRouteId == null) return true;
-      return visibleTripIds.contains(v.vehicle?.trip?.tripId);
+      return visibleTripIds.contains(v.vehicle.trip.tripId);
     });
 
     if (_selectedVehicleId != null) {
@@ -203,11 +203,11 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
           .cast<VehiclePositionEntity?>()
           .firstWhere((v) => v?.id == _selectedVehicleId, orElse: () => null);
 
-      final specificTripId = selectedVehicle?.vehicle?.trip?.tripId;
+      final specificTripId = selectedVehicle?.vehicle.trip.tripId;
 
       Color routeColor = Colors.grey;
       if (selectedVehicle != null) {
-        final tripId = selectedVehicle.vehicle?.trip?.tripId;
+        final tripId = selectedVehicle.vehicle.trip.tripId;
         final routeId = tripToRouteIdMap[tripId];
         final colorHex = routeId != null ? routeColorMap[routeId] : null;
         if (colorHex != null && colorHex.isNotEmpty) {
@@ -227,7 +227,7 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
           final convertedArrival = formatGtfsTime(arrival);
           final convertedDeparture = formatGtfsTime(departure);
 
-          if (stopId != null && _stopCache.containsKey(stopId)) {
+          if (_stopCache.containsKey(stopId)) {
             final stop = _stopCache[stopId]!;
 
             stopMarkers.add(
@@ -280,7 +280,7 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
                             overflow: TextOverflow.ellipsis,
                           ),
                           Text(
-                            "arrival: ${convertedArrival},",
+                            "arrival: $convertedArrival,",
                             style: const TextStyle(
                               color: Colors.black,
                               fontSize: 10,
@@ -291,7 +291,7 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
                             overflow: TextOverflow.ellipsis,
                           ),
                           Text(
-                            "departure: ${convertedDeparture}",
+                            "departure: $convertedDeparture",
                             style: const TextStyle(
                               color: Colors.black,
                               fontSize: 10,
@@ -329,16 +329,16 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
     }
 
     for (var v in visibleVehicles) {
-      final lat = v.vehicle?.position?.latitude;
-      final lon = v.vehicle?.position?.longitude;
+      final lat = v.vehicle.position.latitude;
+      final lon = v.vehicle.position.longitude;
       final bearing = v.vehicle.position.bearing;
-      final double bearingRadians = bearing! * (pi / 180);
+      final double bearingRadians = bearing * (pi / 180);
       final unixTimestamp = v.vehicle.timestamp;
       final DateTime date = DateTime.fromMillisecondsSinceEpoch(
         unixTimestamp * 1000,
       );
       final String formattedTime = DateFormat('h:mm a').format(date);
-      final tripId = v.vehicle?.trip?.tripId;
+      final tripId = v.vehicle.trip.tripId;
       final vehicleId = v.id;
       final status = vehicleStatus[vehicleId];
       final stop = vehicleStop[vehicleId];
@@ -371,7 +371,6 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
 
         if (isSelected) {
           markerContent = VehicleMarkerMenu(
-            child: markerContent,
             isBus: routeType == 0 || routeType == 2 ? false : true,
             headsign: headsign,
             timestamp: formattedTime,
@@ -380,6 +379,7 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
             onCompassPressed: () => debugPrint("Compass tapped for $vehicleId"),
             onWarningPressed: () => debugPrint("Warning tapped for $vehicleId"),
             onInfoPressed: () => debugPrint("Info tapped for $vehicleId"),
+            child: markerContent,
           );
         } else {
           markerContent = GestureDetector(

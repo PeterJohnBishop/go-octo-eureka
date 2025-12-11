@@ -63,7 +63,7 @@ func FetchVehiclePosition() (*gtfs.FeedMessage, error) {
 
 // Routes
 func findRouteByID(routeId string) (*Route, bool) {
-	data := RouteData
+	data := Routes
 	n := len(data)
 
 	idx := sort.Search(n, func(i int) bool {
@@ -78,7 +78,7 @@ func findRouteByID(routeId string) (*Route, bool) {
 
 // Trips
 func findTripByID(tripId string) (*Trip, bool) {
-	data := TripData
+	data := Trips
 	n := len(data)
 
 	idx := sort.Search(n, func(i int) bool {
@@ -93,7 +93,7 @@ func findTripByID(tripId string) (*Trip, bool) {
 
 // Stops
 func findStopById(stopId string) (*Stop, bool) {
-	data := StopData
+	data := Stops
 	n := len(data)
 
 	idx := sort.Search(n, func(i int) bool {
@@ -108,7 +108,7 @@ func findStopById(stopId string) (*Stop, bool) {
 
 // Stop Times
 func findStopTimesByTripID(tripId string) ([]StopTime, bool) {
-	data := StopTimeData
+	data := StopTimes
 	n := len(data)
 
 	idx := sort.Search(n, func(i int) bool {
@@ -142,7 +142,7 @@ func findStopTimeByTripAndStop(tripId, stopId string) (*StopTime, bool) {
 
 // Shapes
 func findShapeById(shapeId string) ([]Shape, bool) {
-	data := ShapeData
+	data := Shapes
 	n := len(data)
 
 	idx := sort.Search(n, func(i int) bool {

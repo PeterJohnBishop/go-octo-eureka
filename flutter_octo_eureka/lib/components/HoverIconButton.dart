@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 class HoverIconButton extends StatelessWidget {
   final onTap;
-  const HoverIconButton({this.onTap});
+  const HoverIconButton({super.key, this.onTap});
 
   @override
   Widget build(BuildContext context) {

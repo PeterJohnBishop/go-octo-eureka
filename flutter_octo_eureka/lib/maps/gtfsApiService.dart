@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_octo_eureka/maps/gtfsTypes.dart';
 
 class GtfsApiService {
-  static const String baseUrl = "http://localhost:8080/gtfs";
+  static const String baseUrl = "https://go-octo-eureka-b5f27b3f9a5c.herokuapp.com/gtfs";
 
   Future<dynamic> _get(String endpoint) async {
     final url = Uri.parse('$baseUrl$endpoint');

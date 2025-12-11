@@ -1,10 +1,9 @@
-package output
+package processing
 
 import (
 	"bufio"
 	"encoding/csv"
 	"fmt"
-	"go-octo-eureka/server/processing"
 	"io"
 	"os"
 	"sort"
@@ -12,8 +11,8 @@ import (
 	"strings"
 )
 
-const outputUrl = "/Users/macbookair/Development/go-octo-eureka/server/processing/output/"
-const inputUrl = "/Users/macbookair/Development/go-octo-eureka/server/processing/input/"
+const outputUrl = "/Users/peterbishop/Development/go-octo-eureka/server/processing/"
+const inputUrl = "/Users/peterbishop/Development/go-octo-eureka/server/processing/input/"
 
 func OpenCSVReader(fileName string) (*csv.Reader, *os.File, error) {
 	file, err := os.Open(inputUrl + fileName)
@@ -46,7 +45,7 @@ func GenerateTripData() bool {
 	}
 	defer inFile.Close()
 
-	var data []processing.Trip
+	var data []Trip
 	for {
 		row, err := reader.Read()
 		if err == io.EOF {
@@ -59,7 +58,7 @@ func GenerateTripData() bool {
 		var directionID int
 		fmt.Sscanf(row[4], "%d", &directionID)
 
-		data = append(data, processing.Trip{
+		data = append(data, Trip{
 			RouteID:      row[0],
 			ServiceID:    row[1],
 			TripID:       row[2],
@@ -85,9 +84,8 @@ func GenerateTripData() bool {
 	writer := bufio.NewWriter(outFile)
 	defer writer.Flush()
 
-	fmt.Fprintln(writer, "package output")
-	fmt.Fprintln(writer, "import \"go-octo-eureka/server/processing\"")
-	fmt.Fprintln(writer, "var Trips = []processing.Trip{")
+	fmt.Fprintln(writer, "package processing")
+	fmt.Fprintln(writer, "var Trips = []Trip{")
 	for _, t := range data {
 		fmt.Fprintf(writer, "\t{RouteID: %q, ServiceID: %q, TripID: %q, TripHeadsign: %q, DirectionID: %d, BlockID: %q, ShapeID: %q},\n",
 			t.RouteID, t.ServiceID, t.TripID, t.TripHeadsign, t.DirectionID, t.BlockID, t.ShapeID)
@@ -111,7 +109,7 @@ func GenerateRouteData() bool {
 	}
 	defer inFile.Close()
 
-	var data []processing.Route
+	var data []Route
 	for {
 		row, err := reader.Read()
 		if err == io.EOF {
@@ -126,7 +124,7 @@ func GenerateRouteData() bool {
 			routeType = 3
 		}
 
-		data = append(data, processing.Route{
+		data = append(data, Route{
 			RouteID:        row[0],
 			AgencyID:       row[1],
 			RouteShortName: row[2],
@@ -154,9 +152,8 @@ func GenerateRouteData() bool {
 	writer := bufio.NewWriter(outFile)
 	defer writer.Flush()
 
-	fmt.Fprintln(writer, "package output")
-	fmt.Fprintln(writer, "import \"go-octo-eureka/server/processing\"")
-	fmt.Fprintln(writer, "var Routes = []processing.Route{")
+	fmt.Fprintln(writer, "package processing")
+	fmt.Fprintln(writer, "var Routes = []Route{")
 	for _, r := range data {
 		fmt.Fprintf(writer, "\t{RouteID: %q, AgencyID: %q, RouteShortName: %q, RouteLongName: %q, RouteDesc: %q, RouteType: %d, RouteURL: %q, RouteColor: %q, RouteTextColor: %q},\n",
 			r.RouteID, r.AgencyID, r.RouteShortName, r.RouteLongName, r.RouteDesc, r.RouteType, r.RouteURL, r.RouteColor, r.RouteTextColor)
@@ -180,7 +177,7 @@ func GenerateShapesData() bool {
 	}
 	defer inFile.Close()
 
-	var data []processing.Shape
+	var data []Shape
 	for {
 		row, err := reader.Read()
 		if err == io.EOF {
@@ -203,7 +200,7 @@ func GenerateShapesData() bool {
 			fmt.Sscanf(strings.TrimSpace(row[4]), "%f", &dist)
 		}
 
-		data = append(data, processing.Shape{
+		data = append(data, Shape{
 			ShapeID:           row[0],
 			ShapePtLat:        lat,
 			ShapePtLon:        lon,
@@ -230,9 +227,8 @@ func GenerateShapesData() bool {
 	writer := bufio.NewWriter(outFile)
 	defer writer.Flush()
 
-	fmt.Fprintln(writer, "package output")
-	fmt.Fprintln(writer, "import \"go-octo-eureka/server/processing\"")
-	fmt.Fprintln(writer, "var Shapes = []processing.Shape{")
+	fmt.Fprintln(writer, "package processing")
+	fmt.Fprintln(writer, "var Shapes = []Shape{")
 	for _, s := range data {
 		fmt.Fprintf(writer, "\t{ShapeID: %q, ShapePtLat: %f, ShapePtLon: %f, ShapePtSequence: %d, ShapeDistTraveled: %f},\n",
 			s.ShapeID, s.ShapePtLat, s.ShapePtLon, s.ShapePtSequence, s.ShapeDistTraveled)
@@ -256,7 +252,7 @@ func GenerateStopTimesData() bool {
 	}
 	defer inFile.Close()
 
-	var data []processing.StopTime
+	var data []StopTime
 	for {
 		row, err := reader.Read()
 		if err == io.EOF {
@@ -270,7 +266,7 @@ func GenerateStopTimesData() bool {
 		pickup, _ := strconv.Atoi(row[6])
 		drop, _ := strconv.Atoi(row[7])
 
-		data = append(data, processing.StopTime{
+		data = append(data, StopTime{
 			TripID:        row[0],
 			ArrivalTime:   row[1],
 			DepartureTime: row[2],
@@ -299,9 +295,8 @@ func GenerateStopTimesData() bool {
 	writer := bufio.NewWriter(outFile)
 	defer writer.Flush()
 
-	fmt.Fprintln(writer, "package output")
-	fmt.Fprintln(writer, "import \"go-octo-eureka/server/processing\"")
-	fmt.Fprintln(writer, "var StopTimes = []processing.StopTime{")
+	fmt.Fprintln(writer, "package processing")
+	fmt.Fprintln(writer, "var StopTimes = []StopTime{")
 	for _, st := range data {
 		fmt.Fprintf(writer, "\t{TripID: %q, ArrivalTime: %q, DepartureTime: %q, StopID: %q, StopSequence: %d, PickupType: %d, DropOffType: %d},\n",
 			st.TripID, st.ArrivalTime, st.DepartureTime, st.StopID, st.StopSequence, st.PickupType, st.DropOffType)
@@ -325,7 +320,7 @@ func GenerateStopsData() bool {
 	}
 	defer inFile.Close()
 
-	var data []processing.Stop
+	var data []Stop
 	for {
 		row, err := reader.Read()
 		if err == io.EOF {
@@ -338,7 +333,7 @@ func GenerateStopsData() bool {
 		lat, _ := strconv.ParseFloat(row[4], 64)
 		lon, _ := strconv.ParseFloat(row[5], 64)
 
-		data = append(data, processing.Stop{
+		data = append(data, Stop{
 			StopID:   row[0],
 			StopCode: row[1],
 			StopName: row[2],
@@ -363,9 +358,8 @@ func GenerateStopsData() bool {
 	writer := bufio.NewWriter(outFile)
 	defer writer.Flush()
 
-	fmt.Fprintln(writer, "package output")
-	fmt.Fprintln(writer, "import \"go-octo-eureka/server/processing\"")
-	fmt.Fprintln(writer, "var Stops = []processing.Stop{")
+	fmt.Fprintln(writer, "package processing")
+	fmt.Fprintln(writer, "var Stops = []Stop{")
 	for _, s := range data {
 		fmt.Fprintf(writer, "\t{StopID: %q, StopCode: %q, StopName: %q, StopDesc: %q, StopLat: %f, StopLon: %f},\n",
 			s.StopID, s.StopCode, s.StopName, s.StopDesc, s.StopLat, s.StopLon)

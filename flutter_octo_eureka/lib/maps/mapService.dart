@@ -21,7 +21,7 @@ class MapService {
     List<VehiclePositionEntity> vehicles,
   ) async {
     final Set<String> uniqueRouteIds = vehicles
-        .map((v) => v.vehicle?.trip?.routeId)
+        .map((v) => v.vehicle.trip.routeId)
         .where((id) => id != null)
         .cast<String>()
         .toSet();
@@ -47,7 +47,7 @@ class MapService {
     List<VehiclePositionEntity> vehicles,
   ) async {
     final Set<String> uniqueTripIds = vehicles
-        .map((v) => v.vehicle?.trip?.tripId)
+        .map((v) => v.vehicle.trip.tripId)
         .where((id) => id != null)
         .cast<String>()
         .toSet();
@@ -212,12 +212,12 @@ class VehiclePinIcon extends StatelessWidget {
   final double bearing;
 
   const VehiclePinIcon({
-    Key? key,
+    super.key,
     required this.iconColor,
     required this.vehicleIconData,
     this.size = 40.0,
     required this.bearing,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -299,7 +299,7 @@ class VehicleMarkerMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const double buttonSize = 40.0;
-    var statusString;
+    String statusString;
     if (status == 0) {
       statusString = "Arriving at";
     } else if (status == 1) {
@@ -385,7 +385,7 @@ class VehicleMarkerMenu extends StatelessWidget {
                             )
                           : SizedBox(),
                       Text(
-                        "Status updated at ${timestamp}",
+                        "Status updated at $timestamp",
                         style: const TextStyle(
                           color: Colors.black,
                           fontSize: 10,

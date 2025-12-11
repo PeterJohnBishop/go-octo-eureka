@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 class NeumorphicHoverIconButton extends StatefulWidget {
   final VoidCallback? onTap; 
 
-  const NeumorphicHoverIconButton({Key? key, this.onTap}) : super(key: key);
+  const NeumorphicHoverIconButton({super.key, this.onTap});
 
   @override
   _NeumorphicHoverIconButtonState createState() => _NeumorphicHoverIconButtonState();

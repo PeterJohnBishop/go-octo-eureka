@@ -1,132 +1,11 @@
-package transport
+package processing
 
 import (
 	"fmt"
-	"go-octo-eureka/server/processing"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
-
-// GET /alerts
-func HandleAlert(c *gin.Context) {
-	feed, err := FetchAlerts()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Error fetching Alerts: %v", err)})
-		return
-	}
-
-	var results []processing.AlertEntity
-
-	for _, entity := range feed.Entity {
-		if entity.Alert == nil {
-			continue
-		}
-
-		var activePeriods []processing.ActivePeriod
-		for _, ap := range entity.Alert.ActivePeriod {
-			activePeriods = append(activePeriods, processing.ActivePeriod{
-				Start: int64(ap.GetStart()),
-				End:   int64(ap.GetEnd()),
-			})
-		}
-
-		var informedEntities []processing.InformedEntity
-		for _, ie := range entity.Alert.InformedEntity {
-			informedEntities = append(informedEntities, processing.InformedEntity{
-				AgencyID:  ie.GetAgencyId(),
-				RouteID:   ie.GetRouteId(),
-				RouteType: int(ie.GetRouteType()),
-				StopID:    ie.GetStopId(),
-			})
-		}
-
-		var headerTranslations []processing.Translation
-		if entity.Alert.HeaderText != nil {
-			for _, t := range entity.Alert.HeaderText.Translation {
-				headerTranslations = append(headerTranslations, processing.Translation{
-					Text:     t.GetText(),
-					Language: t.GetLanguage(),
-				})
-			}
-		}
-
-		var descTranslations []processing.Translation
-		if entity.Alert.DescriptionText != nil {
-			for _, t := range entity.Alert.DescriptionText.Translation {
-				descTranslations = append(descTranslations, processing.Translation{
-					Text:     t.GetText(),
-					Language: t.GetLanguage(),
-				})
-			}
-		}
-
-		results = append(results, processing.AlertEntity{
-			ID: entity.GetId(),
-			Alert: processing.Alert{
-				ActivePeriod:    activePeriods,
-				InformedEntity:  informedEntities,
-				Cause:           int(entity.Alert.GetCause()),
-				Effect:          int(entity.Alert.GetEffect()),
-				HeaderText:      processing.TranslatedString{Translation: headerTranslations},
-				DescriptionText: processing.TranslatedString{Translation: descTranslations},
-			},
-		})
-	}
-
-	c.JSON(http.StatusOK, results)
-}
-
-// GET /tripupdates
-func HandleTripUpdate(c *gin.Context) {
-	feed, err := FetchTripUpdates()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Error fetching TripUpdates: %v", err)})
-		return
-	}
-
-	var results []processing.TripUpdateEntity
-
-	for _, entity := range feed.Entity {
-		if entity.TripUpdate == nil {
-			continue
-		}
-
-		tu := entity.TripUpdate
-
-		// Map StopTimeUpdates
-		var stopTimeUpdates []processing.StopTimeUpdate
-		for _, stu := range tu.StopTimeUpdate {
-			stopTimeUpdates = append(stopTimeUpdates, processing.StopTimeUpdate{
-				StopSequence:         int(stu.GetStopSequence()),
-				StopID:               stu.GetStopId(),
-				Arrival:              processing.StopTimeEvent{Time: int64(stu.GetArrival().GetTime())},
-				Departure:            processing.StopTimeEvent{Time: int64(stu.GetDeparture().GetTime())},
-				ScheduleRelationship: int(stu.GetScheduleRelationship()),
-			})
-		}
-
-		results = append(results, processing.TripUpdateEntity{
-			ID: entity.GetId(),
-			TripUpdate: processing.TripUpdate{
-				Trip: processing.TripDescriptor{
-					TripID:               tu.GetTrip().GetTripId(),
-					RouteID:              tu.GetTrip().GetRouteId(),
-					DirectionID:          int(tu.GetTrip().GetDirectionId()),
-					ScheduleRelationship: int(tu.GetTrip().GetScheduleRelationship()),
-				},
-				Vehicle: processing.VehicleDescriptor{
-					ID:    tu.GetVehicle().GetId(),
-					Label: tu.GetVehicle().GetLabel(),
-				},
-				StopTimeUpdate: stopTimeUpdates,
-				Timestamp:      int64(tu.GetTimestamp()),
-			},
-		})
-	}
-
-	c.JSON(http.StatusOK, results)
-}
 
 // GET /vehiclepositions
 func HandleVehiclePosition(c *gin.Context) {
@@ -136,7 +15,7 @@ func HandleVehiclePosition(c *gin.Context) {
 		return
 	}
 
-	var results []processing.VehiclePositionEntity
+	var results []VehiclePositionEntity
 
 	for _, entity := range feed.Entity {
 		if entity.Vehicle == nil {
@@ -145,20 +24,20 @@ func HandleVehiclePosition(c *gin.Context) {
 
 		v := entity.Vehicle
 
-		results = append(results, processing.VehiclePositionEntity{
+		results = append(results, VehiclePositionEntity{
 			ID: entity.GetId(),
-			Vehicle: processing.VehiclePosition{
-				Trip: processing.TripDescriptor{
+			Vehicle: VehiclePosition{
+				Trip: TripDescriptor{
 					TripID:               v.GetTrip().GetTripId(),
 					RouteID:              v.GetTrip().GetRouteId(),
 					DirectionID:          int(v.GetTrip().GetDirectionId()),
 					ScheduleRelationship: int(v.GetTrip().GetScheduleRelationship()),
 				},
-				Vehicle: processing.VehicleDescriptor{
+				Vehicle: VehicleDescriptor{
 					ID:    v.GetVehicle().GetId(),
 					Label: v.GetVehicle().GetLabel(),
 				},
-				Position: processing.GeoPosition{
+				Position: GeoPosition{
 					Latitude:  float64(v.GetPosition().GetLatitude()),
 					Longitude: float64(v.GetPosition().GetLongitude()),
 					Bearing:   float64(v.GetPosition().GetBearing()),
@@ -174,31 +53,124 @@ func HandleVehiclePosition(c *gin.Context) {
 	c.JSON(http.StatusOK, results)
 }
 
-// GET /routes
-func HandleRoutes(c *gin.Context) {
-	routes := make([]processing.Route, 0, len(RoutesMap))
-	for _, r := range RoutesMap {
-		routes = append(routes, r)
+// GET /alerts
+func HandleAlert(c *gin.Context) {
+	feed, err := FetchAlerts()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Error fetching Alerts: %v", err)})
+		return
 	}
-	c.JSON(http.StatusOK, routes)
+
+	var results []AlertEntity
+
+	for _, entity := range feed.Entity {
+		if entity.Alert == nil {
+			continue
+		}
+
+		var activePeriods []ActivePeriod
+		for _, ap := range entity.Alert.ActivePeriod {
+			activePeriods = append(activePeriods, ActivePeriod{
+				Start: int64(ap.GetStart()),
+				End:   int64(ap.GetEnd()),
+			})
+		}
+
+		var informedEntities []InformedEntity
+		for _, ie := range entity.Alert.InformedEntity {
+			informedEntities = append(informedEntities, InformedEntity{
+				AgencyID:  ie.GetAgencyId(),
+				RouteID:   ie.GetRouteId(),
+				RouteType: int(ie.GetRouteType()),
+				StopID:    ie.GetStopId(),
+			})
+		}
+
+		var headerTranslations []Translation
+		if entity.Alert.HeaderText != nil {
+			for _, t := range entity.Alert.HeaderText.Translation {
+				headerTranslations = append(headerTranslations, Translation{
+					Text:     t.GetText(),
+					Language: t.GetLanguage(),
+				})
+			}
+		}
+
+		var descTranslations []Translation
+		if entity.Alert.DescriptionText != nil {
+			for _, t := range entity.Alert.DescriptionText.Translation {
+				descTranslations = append(descTranslations, Translation{
+					Text:     t.GetText(),
+					Language: t.GetLanguage(),
+				})
+			}
+		}
+
+		results = append(results, AlertEntity{
+			ID: entity.GetId(),
+			Alert: Alert{
+				ActivePeriod:    activePeriods,
+				InformedEntity:  informedEntities,
+				Cause:           int(entity.Alert.GetCause()),
+				Effect:          int(entity.Alert.GetEffect()),
+				HeaderText:      TranslatedString{Translation: headerTranslations},
+				DescriptionText: TranslatedString{Translation: descTranslations},
+			},
+		})
+	}
+
+	c.JSON(http.StatusOK, results)
 }
 
-// GET /stops
-func HandleStops(c *gin.Context) {
-	stops := make([]processing.Stop, 0, len(StopsMap))
-	for _, s := range StopsMap {
-		stops = append(stops, s)
+// GET /tripupdates
+func HandleTripUpdate(c *gin.Context) {
+	feed, err := FetchTripUpdates()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Error fetching TripUpdates: %v", err)})
+		return
 	}
-	c.JSON(http.StatusOK, stops)
-}
 
-// GET /trips
-func HandleTrips(c *gin.Context) {
-	trips := make([]processing.Trip, 0, len(TripsMap))
-	for _, t := range TripsMap {
-		trips = append(trips, t)
+	var results []TripUpdateEntity
+
+	for _, entity := range feed.Entity {
+		if entity.TripUpdate == nil {
+			continue
+		}
+
+		tu := entity.TripUpdate
+
+		// Map StopTimeUpdates
+		var stopTimeUpdates []StopTimeUpdate
+		for _, stu := range tu.StopTimeUpdate {
+			stopTimeUpdates = append(stopTimeUpdates, StopTimeUpdate{
+				StopSequence:         int(stu.GetStopSequence()),
+				StopID:               stu.GetStopId(),
+				Arrival:              StopTimeEvent{Time: int64(stu.GetArrival().GetTime())},
+				Departure:            StopTimeEvent{Time: int64(stu.GetDeparture().GetTime())},
+				ScheduleRelationship: int(stu.GetScheduleRelationship()),
+			})
+		}
+
+		results = append(results, TripUpdateEntity{
+			ID: entity.GetId(),
+			TripUpdate: TripUpdate{
+				Trip: TripDescriptor{
+					TripID:               tu.GetTrip().GetTripId(),
+					RouteID:              tu.GetTrip().GetRouteId(),
+					DirectionID:          int(tu.GetTrip().GetDirectionId()),
+					ScheduleRelationship: int(tu.GetTrip().GetScheduleRelationship()),
+				},
+				Vehicle: VehicleDescriptor{
+					ID:    tu.GetVehicle().GetId(),
+					Label: tu.GetVehicle().GetLabel(),
+				},
+				StopTimeUpdate: stopTimeUpdates,
+				Timestamp:      int64(tu.GetTimestamp()),
+			},
+		})
 	}
-	c.JSON(http.StatusOK, trips)
+
+	c.JSON(http.StatusOK, results)
 }
 
 // GET /shapes/:id

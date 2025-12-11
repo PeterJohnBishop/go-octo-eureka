@@ -5,7 +5,7 @@ import (
 	"go-octo-eureka/server/email"
 	"go-octo-eureka/server/mapping"
 	"go-octo-eureka/server/processing"
-	"go-octo-eureka/server/transport"
+	"go-octo-eureka/server/processing/output"
 	"go-octo-eureka/server/wsservice"
 	"log"
 	"os"
@@ -22,62 +22,54 @@ func ServeGin() {
 		port = "8080"
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(5)
+	// uncomment if data files have been updated to regenerate data sets
 
-	go func() {
-		fmt.Println("Starting GenerateTripData...")
-		haveData := processing.LoadTripData()
-		if haveData {
-			fmt.Println("Initializing Trip Map...")
-			transport.InitTripsMap()
-		}
-		fmt.Println("Finished GenerateTripData")
-		wg.Done()
-	}()
-	go func() {
-		fmt.Println("Starting GenerateRouteData...")
-		haveData := processing.LoadRouteData()
-		if haveData {
-			fmt.Println("Initializing Route Map...")
-			transport.InitRouteMap()
-		}
-		fmt.Println("Finished GenerateRouteData")
-		wg.Done()
-	}()
-	go func() {
-		fmt.Println("Starting GenerateShapesData...")
-		haveData := processing.LoadShapeData()
-		if haveData {
-			fmt.Println("Initializing Shapes Map...")
-			transport.InitShapesMap()
-		}
-		fmt.Println("Finished GenerateShapesData")
-		wg.Done()
-	}()
-	go func() {
-		fmt.Println("Starting GenerateStopTimesData...")
-		haveData := processing.LoadStopTimeData()
-		if haveData {
-			fmt.Println("Initializing Stop Times Map...")
-			transport.InitStopTimesMap()
-		}
-		fmt.Println("Finished GenerateStopTimesData")
-		wg.Done()
-	}()
-	go func() {
-		fmt.Println("Starting GenerateStopsData...")
-		haveData := processing.LoadStopData()
-		if haveData {
-			fmt.Println("Initializing Stops Map...")
-			transport.InitStopsMap()
-		}
-		fmt.Println("Finished GenerateStopsData")
-		wg.Done()
-	}()
+	// var wg sync.WaitGroup
+	// wg.Add(5)
 
-	wg.Wait()
-	fmt.Println("All processing tasks completed.")
+	// go func() {
+	// 	fmt.Println("Starting GenerateTripData...")
+	// 	haveData := output.GenerateTripData()
+	// 	if haveData {
+	// 		fmt.Println("Finished GenerateTripData")
+	// 	}
+	// 	wg.Done()
+	// }()
+	// go func() {
+	// 	fmt.Println("Starting GenerateRouteData...")
+	// 	haveData := output.GenerateRouteData()
+	// 	if haveData {
+	// 		fmt.Println("Finished GenerateRouteData")
+	// 	}
+	// 	wg.Done()
+	// }()
+	// go func() {
+	// 	fmt.Println("Starting GenerateShapesData...")
+	// 	haveData := output.GenerateShapesData()
+	// 	if haveData {
+	// 		fmt.Println("Finished GenerateShapesData")
+	// 	}
+	// 	wg.Done()
+	// }()
+	// go func() {
+	// 	fmt.Println("Starting GenerateStopTimesData...")
+	// 	haveData := output.GenerateStopTimesData()
+	// 	if haveData {
+	// 		fmt.Println("Finished GenerateStopTimesData")
+	// 	}
+	// 	wg.Done()
+	// }()
+	// go func() {
+	// 	fmt.Println("Starting GenerateStopsData...")
+	// 	haveData := output.GenerateStopsData()
+	// 	if haveData {
+	// 		fmt.Println("Finished GenerateStopsData")
+	// 	}
+	// 	wg.Done()
+	// }()
+
+	// wg.Wait()
+	// fmt.Println("All processing tasks completed.")
 
 	resendClient, resendError := email.InitResendClient()
 	if resendError != nil {
@@ -112,7 +104,7 @@ func ServeGin() {
 	}
 	wsservice.WebSocketRoutes(r)
 
-	transport.AddGTFSRoutes(r)
+	processing.AddGTFSRoutes(r)
 
 	log.Printf("Serving Gin at :%s", port)
 	srv := fmt.Sprintf(":%s", port)

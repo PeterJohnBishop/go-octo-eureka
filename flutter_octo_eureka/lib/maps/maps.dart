@@ -72,16 +72,7 @@ class _MapViewState extends State<MapView> {
         setState(() {
           _vehiclePositions = positions;
           _routes = routes;
-          _routeMenuItems = [
-            const DropdownMenuItem<String>(
-              value: null,
-              child: Text(
-                "All Routes",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-            ...menuItems,
-          ];
+          _routeMenuItems = menuItems;
           _isLoading = false;
         });
       }
@@ -256,6 +247,16 @@ class _MapViewState extends State<MapView> {
                               underline: Container(),
                               onChanged: (value) {
                                 setState(() {
+                                  // clear any previous selections
+                                  _selectedVehicles = [];
+                                  _trips = [];
+                                  _stopTimes = [];
+                                  _shapes = [];
+                                  _stops = [];
+                                  _activePolylines = [];
+                                  _activeMarkers = [];
+                                  _vehicleMarkers = [];
+                                  // set selected route
                                   _selectedRouteId = value;
                                 });
                                 _loadTrips(_vehiclePositions);

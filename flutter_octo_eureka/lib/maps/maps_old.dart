@@ -57,7 +57,7 @@ class _BaseMapWidgetState extends State<BaseMapWidget> {
 
   Future<void> _fetchVehiclePositionsData({bool isBackground = false}) async {
     if (!isBackground) {
-      setState(() => _isLoading = true); //
+      setState(() => _isLoading = true); 
     }
     try {
       final positions = await mapService.loadVehiclePositions();

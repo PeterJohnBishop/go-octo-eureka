@@ -5,13 +5,9 @@ import (
 	"go-octo-eureka/server/email"
 	"go-octo-eureka/server/mapping"
 	"go-octo-eureka/server/processing"
-
-	// "go-octo-eureka/server/processing/output"
 	"go-octo-eureka/server/wsservice"
 	"log"
 	"os"
-
-	// "sync"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -31,7 +27,7 @@ func ServeGin() {
 
 	// go func() {
 	// 	fmt.Println("Starting GenerateTripData...")
-	// 	haveData := output.GenerateTripData()
+	// 	haveData := processing.GenerateTripData()
 	// 	if haveData {
 	// 		fmt.Println("Finished GenerateTripData")
 	// 	}
@@ -39,7 +35,7 @@ func ServeGin() {
 	// }()
 	// go func() {
 	// 	fmt.Println("Starting GenerateRouteData...")
-	// 	haveData := output.GenerateRouteData()
+	// 	haveData := processing.GenerateRouteData()
 	// 	if haveData {
 	// 		fmt.Println("Finished GenerateRouteData")
 	// 	}
@@ -47,7 +43,7 @@ func ServeGin() {
 	// }()
 	// go func() {
 	// 	fmt.Println("Starting GenerateShapesData...")
-	// 	haveData := output.GenerateShapesData()
+	// 	haveData := processing.GenerateShapesData()
 	// 	if haveData {
 	// 		fmt.Println("Finished GenerateShapesData")
 	// 	}
@@ -55,7 +51,7 @@ func ServeGin() {
 	// }()
 	// go func() {
 	// 	fmt.Println("Starting GenerateStopTimesData...")
-	// 	haveData := output.GenerateStopTimesData()
+	// 	haveData := processing.GenerateStopTimesData()
 	// 	if haveData {
 	// 		fmt.Println("Finished GenerateStopTimesData")
 	// 	}
@@ -63,7 +59,7 @@ func ServeGin() {
 	// }()
 	// go func() {
 	// 	fmt.Println("Starting GenerateStopsData...")
-	// 	haveData := output.GenerateStopsData()
+	// 	haveData := processing.GenerateStopsData()
 	// 	if haveData {
 	// 		fmt.Println("Finished GenerateStopsData")
 	// 	}

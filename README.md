@@ -8,3 +8,7 @@ docker push registry.heroku.com/go-octo-eureka/web
 heroku container:release web -a go-octo-eureka
 
 https://go-octo-eureka-b5f27b3f9a5c.herokuapp.com/
+
+# docker
+docker build -t peterjbishop/goocto-eureka:latest .
+docker push peterjbishop/goocto-eureka:latest

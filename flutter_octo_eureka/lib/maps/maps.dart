@@ -141,8 +141,8 @@ class _MapViewState extends State<MapView> {
           _shapes = shapes;
           _stops = stops;
           _buildTripPolyline(shapes, colorFromHex);
-          _buildStopMarkers(stops);
-          _activeMarkers = [..._vehicleMarkers, ..._stopMarkers];
+          _buildStopMarkers(stops, colorFromHex);
+          _activeMarkers = [..._stopMarkers, ..._vehicleMarkers];
           _isLoading = false;
         });
       }
@@ -170,39 +170,109 @@ class _MapViewState extends State<MapView> {
     });
   }
 
-  void _buildStopMarkers(List<Stop> stops) {
+  void _buildStopMarkers(List<Stop> stops, Color colorFromHex) {
     List<Marker> newStopMarkers = [];
 
     for (var stop in stops) {
+      final vehicleStopTime = _stopTimes.firstWhere((s) {
+        return s.stopId == stop.stopId;
+      });
+      final convertedArrival = dataservice.formatGtfsTime(
+        vehicleStopTime.arrivalTime,
+      );
+      final convertedDeparture = dataservice.formatGtfsTime(
+        vehicleStopTime.departureTime,
+      );
+
       newStopMarkers.add(
         Marker(
           point: LatLng(stop.stopLat, stop.stopLon),
-          width: 16.0,
-          height: 16.0,
+          width: 200.0,
+          height: 175.0,
           alignment: Alignment.center,
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.black, width: 2),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.2),
-                  blurRadius: 2,
-                  offset: const Offset(0, 1),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(6),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      blurRadius: 2,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            child: Center(
-              child: Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: Colors.black,
-                  shape: BoxShape.circle,
+                child: Column(
+                  children: [
+                    Text(
+                      stop.stopName,
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      "Scheduled",
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      "arrival: $convertedArrival,",
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      "departure: $convertedDeparture",
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
               ),
-            ),
+              const SizedBox(height: 10),
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: colorFromHex, width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.2),
+                      blurRadius: 2,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       );

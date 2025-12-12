@@ -29,9 +29,12 @@ class _MapViewState extends State<MapView> {
   List<Stop> _stops = [];
   List<Polyline> _activePolylines = [];
   List<Marker> _activeMarkers = [];
+  List<Marker> _stopMarkers = [];
 
   bool _isLoading = true;
   String? _selectedRouteId;
+  String? _selectedVehicleId;
+
   Timer? _updateTimer;
 
   @override
@@ -56,6 +59,7 @@ class _MapViewState extends State<MapView> {
 
   // fetch real time vehicle data
   // provides route_id to populate the inital route menu
+  // provides trip_id to populate stop, stop time, and shape data
   Future<void> _fetchVehiclePositionsData() async {
     setState(() => _isLoading = true);
     try {
@@ -113,24 +117,32 @@ class _MapViewState extends State<MapView> {
   }
 
   // if vehicle tapped, draw trip details
-  Future<void> _loadTripDetails(String tripId) async {
+  Future<void> _loadTripDetails(String tripId, Color colorFromHex) async {
     setState(() => _isLoading = true);
+    final trip = _trips.firstWhere((t) {
+      return t.tripId == tripId;
+    });
     try {
+      final List<Shape> shapes = await dataservice.fetchShapeById(trip.shapeId);
       final List<StopTime> stopTimes = await dataservice.fetchStopTimesByTripId(
         tripId,
       );
-      final List<Shape> shapes = await dataservice.fetchShapeById(tripId);
+
       var stops = <Stop>[];
       if (stopTimes.isNotEmpty) {
         stops = await Future.wait(
           stopTimes.map((st) => dataservice.fetchStopById(st.stopId)),
         );
       }
+
       if (mounted) {
         setState(() {
           _stopTimes = stopTimes;
           _shapes = shapes;
           _stops = stops;
+          _buildTripPolyline(shapes, colorFromHex);
+          _buildStopMarkers(stops);
+          _activeMarkers = [..._vehicleMarkers, ..._stopMarkers];
           _isLoading = false;
         });
       }
@@ -138,6 +150,67 @@ class _MapViewState extends State<MapView> {
       debugPrint("Error loading trip details: $e");
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _buildTripPolyline(List<Shape> shapes, Color colorFromHex) {
+    shapes.sort((a, b) => a.shapePtSequence.compareTo(b.shapePtSequence));
+
+    final points = shapes
+        .map((s) => LatLng(s.shapePtLat, s.shapePtLon))
+        .toList();
+
+    final polyline = Polyline(
+      points: points,
+      strokeWidth: 4.0,
+      color: colorFromHex,
+    );
+
+    setState(() {
+      _activePolylines = [polyline];
+    });
+  }
+
+  void _buildStopMarkers(List<Stop> stops) {
+    List<Marker> newStopMarkers = [];
+
+    for (var stop in stops) {
+      newStopMarkers.add(
+        Marker(
+          point: LatLng(stop.stopLat, stop.stopLon),
+          width: 16.0,
+          height: 16.0,
+          alignment: Alignment.center,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.black, width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.2),
+                  blurRadius: 2,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+            child: Center(
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: Colors.black,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    setState(() {
+      _stopMarkers = newStopMarkers;
+    });
   }
 
   void _showVehicles() {
@@ -157,9 +230,10 @@ class _MapViewState extends State<MapView> {
       final bearing = vehicle.vehicle.position.bearing;
       final double bearingRadians = bearing * (pi / 180);
       final double baseSize = 50.0;
+      final Color iconColor = dataservice.colorFromHex(route.routeColor);
 
       Widget markerContent = VehiclePinIcon(
-        iconColor: dataservice.colorFromHex(route.routeColor),
+        iconColor: iconColor,
         vehicleIconData: iconData,
         size: 45.0,
         bearing: bearingRadians,
@@ -171,7 +245,15 @@ class _MapViewState extends State<MapView> {
           width: baseSize,
           height: baseSize,
           alignment: Alignment.center,
-          child: markerContent,
+          child: GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedVehicleId = vehicle.id;
+              });
+              _loadTripDetails(vehicle.vehicle.trip.tripId, iconColor);
+            },
+            child: markerContent,
+          ),
         ),
       );
     }
@@ -194,13 +276,19 @@ class _MapViewState extends State<MapView> {
                 flags: InteractiveFlag.all,
               ),
               onTap: (tapPosition, point) {
-                // if (_selectedVehicleId != null) {
-                //   setState(() {
-                //     _selectedRouteId = null;
-                //     _selectedVehicleId = null;
-                //     _refreshMapLayers();
-                //   });
-                // }
+                if (_selectedVehicleId != null) {
+                  setState(() {
+                    _selectedVehicleId = null;
+                    _activePolylines = [];
+                    _activeMarkers = [];
+                    _vehicleMarkers = [];
+                    _stopMarkers = [];
+                    _stopTimes = [];
+                    _shapes = [];
+                    _stops = [];
+                    _loadTrips(_vehiclePositions);
+                  });
+                }
               },
             ),
             children: [
@@ -208,9 +296,12 @@ class _MapViewState extends State<MapView> {
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.flutter_octo_eureka.app',
               ),
+              _activePolylines.isNotEmpty
+                  ? PolylineLayer(polylines: _activePolylines)
+                  : Container(),
               // PolylineLayer(polylines: _activePolylines),
               _vehicleMarkers.isNotEmpty
-                  ? MarkerLayer(markers: _vehicleMarkers)
+                  ? MarkerLayer(markers: _activeMarkers)
                   : Container(),
               RichAttributionWidget(
                 attributions: [

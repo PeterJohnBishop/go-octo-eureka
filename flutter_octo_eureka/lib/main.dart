@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_octo_eureka/maps/maps.dart';
+import 'package:flutter_octo_eureka/maps/maps_old.dart';
 
 void main() {
   runApp(const MyApp());
@@ -34,7 +35,7 @@ class MyApp extends StatelessWidget {
       ),
       home: Scaffold(
         backgroundColor: Color.fromARGB(255, 173, 183, 197),
-        body: BaseMapWidget()
+        body: MapView()
       ),
     );
   }

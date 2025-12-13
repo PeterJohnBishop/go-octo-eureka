@@ -92,7 +92,7 @@ class _MapViewState extends State<MapView> {
       }
       final cleanRoutesList = uniqueRoutes.values.toList();
 
-      final menuItems = dataservice.buildRouteDropdownItems(cleanRoutesList, _alerts);
+      final menuItems = dataservice.buildRouteDropdownItems(context, _routes, _alerts);
 
       if (mounted) {
         setState(() {

@@ -95,60 +95,140 @@ class Dataservice {
   }
 
   // move to UI Service
-  List<DropdownMenuItem<String>> buildRouteDropdownItems(
-    List<gtfsRoute> routes,
-    List<AlertEntity> alerts,
-  ) {
-    return routes.map((route) {
-      Color routeColor = Colors.black;
-      if (route.routeColor.isNotEmpty) {
-        try {
-          final hex = route.routeColor.replaceAll('#', '');
-          routeColor = Color(int.parse("0xFF$hex"));
-        } catch (_) {
-          // Keep default black on error
-        }
+ List<DropdownMenuItem<String>> buildRouteDropdownItems(
+  BuildContext context, 
+  List<gtfsRoute> routes,
+  List<AlertEntity> alerts,
+) {
+  return routes.map((route) {
+    Color routeColor = Colors.black;
+    if (route.routeColor.isNotEmpty) {
+      try {
+        final hex = route.routeColor.replaceAll('#', '');
+        routeColor = Color(int.parse("0xFF$hex"));
+      } catch (_) {
+        // Keep default
       }
+    }
 
-      return DropdownMenuItem<String>(
-        value: route.routeId,
-        child: Row(
-          children: [
-            Container(
-              width: 14,
-              height: 14,
-              decoration: BoxDecoration(
-                color: routeColor,
-                shape: BoxShape.circle,
-              ),
+    final bool hasAlerts = checkRouteAlerts(alerts, route.routeId);
+
+    return DropdownMenuItem<String>(
+      value: route.routeId,
+      child: Row(
+        children: [
+          Container(
+            width: 14,
+            height: 14,
+            decoration: BoxDecoration(
+              color: routeColor,
+              shape: BoxShape.circle,
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                "${route.routeShortName}: ${route.routeLongName}",
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 14),
-              ),
-            ),
-            if (checkRouteAlerts(alerts, route.routeId))
-              GestureDetector(
-                onTap: () {
-                  debugPrint("Alert tapped for ${route.routeId}");
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  child: Icon(
-                    Icons.warning_amber_rounded,
-                    color: Colors.amber,
-                    size: 24,
-                  ),
+          ),
+          
+          const SizedBox(width: 8),
+
+          // Alert Icon (Only shows if active alerts exist)
+          if (hasAlerts)
+            GestureDetector(
+              onTap: () {
+                final routeAlerts = alerts.where((alert) {
+                  return alert.alert.informedEntity.any((entity) => 
+                    entity.routeId == route.routeId
+                  );
+                }).toList();
+
+                _showRouteAlertsDialog(context, route, routeAlerts);
+              },
+              child: Padding(
+                padding: const EdgeInsets.only(right: 8.0),
+                child: Icon(
+                  Icons.warning_amber_rounded,
+                  color: Colors.amber,
+                  size: 20,
                 ),
               ),
-          ],
+            ),
+
+          Expanded(
+            child: Text(
+              "${route.routeShortName}: ${route.routeLongName}",
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 14),
+            ),
+          ),
+        ],
+      ),
+    );
+  }).toList();
+}
+
+void _showRouteAlertsDialog(
+    BuildContext context, gtfsRoute route, List<AlertEntity> alerts) {
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: Text(
+          "Alerts for ${route.routeShortName}",
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
+        content: SizedBox(
+          width: double.maxFinite, 
+          child: alerts.isEmpty
+              ? const Text("No details available.")
+              : ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: alerts.length,
+                  itemBuilder: (context, index) {
+                    final alertData = alerts[index].alert;
+                    
+                    String getTranslation(TranslatedString? ts) {
+                      if (ts == null || ts.translation.isEmpty) return "";
+                      return ts.translation.firstWhere(
+                        (t) => t.language == 'en', 
+                        orElse: () => ts.translation.first
+                      ).text;
+                    }
+
+                    final header = getTranslation(alertData.headerText);
+                    final desc = getTranslation(alertData.descriptionText);
+
+                    return Card(
+                      elevation: 2,
+                      margin: const EdgeInsets.symmetric(vertical: 8),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (header.isNotEmpty)
+                              Text(
+                                header,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.redAccent,
+                                ),
+                              ),
+                            if (header.isNotEmpty) const SizedBox(height: 8),
+                            Text(desc),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text("Close"),
+          ),
+        ],
       );
-    }).toList();
-  }
+    },
+  );
+}
 
   // STOPS
   Future<Stop> fetchStopById(String id) async {

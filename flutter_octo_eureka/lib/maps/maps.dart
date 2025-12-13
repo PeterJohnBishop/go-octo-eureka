@@ -24,6 +24,7 @@ class _MapViewState extends State<MapView> {
   List<VehiclePositionEntity> _vehiclePositions = [];
   List<VehiclePositionEntity> _selectedVehicles = [];
   List<LatLng> _mappededVehiclePositions = [];
+  List<LatLng> _mappedStopPositions = [];
   List<AlertEntity> _alerts = [];
   List<Marker> _vehicleMarkers = [];
   List<gtfsRoute> _routes = [];
@@ -168,6 +169,14 @@ class _MapViewState extends State<MapView> {
       final List<StopTime> stopTimes = await dataservice.fetchStopTimesByTripId(
         tripId,
       );
+
+      _mappedStopPositions.clear();
+      for (var shape in shapes) {
+        _mappedStopPositions.add(
+          LatLng(shape.shapePtLat, shape.shapePtLon),
+        );
+      }
+      
       var stops = <Stop>[];
       if (stopTimes.isNotEmpty) {
         stops = await Future.wait(
@@ -188,6 +197,7 @@ class _MapViewState extends State<MapView> {
             stops,
             colorFromHex,
           );
+          _zoomToFit(_mappedStopPositions);
           _isLoading = false;
         });
         _showVehicles();
@@ -299,7 +309,7 @@ class _MapViewState extends State<MapView> {
 
     setState(() {
       _activeMarkers = [..._stopMarkers, ..._vehicleMarkers];
-      _zoomToFitVehicles(_mappededVehiclePositions);
+      _zoomToFit(_mappededVehiclePositions);
       _isLoading = false;
     });
   }
@@ -358,9 +368,9 @@ class _MapViewState extends State<MapView> {
     _mapController.move(_mapController.camera.center, currentZoom - 1);
   }
 
-  void _zoomToFitVehicles(List<LatLng> vehiclePositions) {
-  if (vehiclePositions.isEmpty) return;
-  final bounds = LatLngBounds.fromPoints(vehiclePositions);
+  void _zoomToFit(List<LatLng> positions) {
+  if (positions.isEmpty) return;
+  final bounds = LatLngBounds.fromPoints(positions);
   _mapController.fitCamera(
     CameraFit.bounds(
       bounds: bounds,

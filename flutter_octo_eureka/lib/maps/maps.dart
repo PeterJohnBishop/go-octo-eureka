@@ -23,6 +23,7 @@ class _MapViewState extends State<MapView> {
 
   List<VehiclePositionEntity> _vehiclePositions = [];
   List<VehiclePositionEntity> _selectedVehicles = [];
+  List<LatLng> _mappededVehiclePositions = [];
   List<AlertEntity> _alerts = [];
   List<Marker> _vehicleMarkers = [];
   List<gtfsRoute> _routes = [];
@@ -199,10 +200,12 @@ class _MapViewState extends State<MapView> {
 
   void _showVehicles() {
     _vehicleMarkers.clear();
+    _mappededVehiclePositions.clear();
 
     for (var vehicle in _selectedVehicles) {
       final lat = vehicle.vehicle.position.latitude;
       final lon = vehicle.vehicle.position.longitude;
+      _mappededVehiclePositions.add(LatLng(lat, lon));
 
       final route = _routes.firstWhere(
         (route) => route.routeId == _selectedRouteId,
@@ -296,6 +299,7 @@ class _MapViewState extends State<MapView> {
 
     setState(() {
       _activeMarkers = [..._stopMarkers, ..._vehicleMarkers];
+      _zoomToFitVehicles(_mappededVehiclePositions);
       _isLoading = false;
     });
   }
@@ -353,6 +357,17 @@ class _MapViewState extends State<MapView> {
     final currentZoom = _mapController.camera.zoom;
     _mapController.move(_mapController.camera.center, currentZoom - 1);
   }
+
+  void _zoomToFitVehicles(List<LatLng> vehiclePositions) {
+  if (vehiclePositions.isEmpty) return;
+  final bounds = LatLngBounds.fromPoints(vehiclePositions);
+  _mapController.fitCamera(
+    CameraFit.bounds(
+      bounds: bounds,
+      padding: const EdgeInsets.all(50.0), 
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {

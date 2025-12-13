@@ -29,6 +29,7 @@ class _MapViewState extends State<MapView> {
   List<Marker> _vehicleMarkers = [];
   List<gtfsRoute> _routes = [];
   List<DropdownMenuItem<String>> _routeMenuItems = [];
+  List<AlertEntity> _activeAlerts = [];
   List<Trip> _trips = [];
   List<StopTime> _stopTimes = [];
   List<Stop> _stops = [];
@@ -49,7 +50,6 @@ class _MapViewState extends State<MapView> {
   void initState() {
     super.initState();
     _fetchVehiclePositionsData();
-    _fetchAlerts();
     _startAutoRefresh();
   }
 
@@ -78,6 +78,7 @@ class _MapViewState extends State<MapView> {
         if (mounted) setState(() => _isLoading = false);
         return;
       }
+      _fetchAlerts();
 
       final List<gtfsRoute> rawRoutes = await dataservice.loadVehicleRoutes(
         positions,
@@ -91,7 +92,7 @@ class _MapViewState extends State<MapView> {
       }
       final cleanRoutesList = uniqueRoutes.values.toList();
 
-      final menuItems = dataservice.buildRouteDropdownItems(cleanRoutesList);
+      final menuItems = dataservice.buildRouteDropdownItems(cleanRoutesList, _alerts);
 
       if (mounted) {
         setState(() {
@@ -116,12 +117,22 @@ class _MapViewState extends State<MapView> {
     }
   }
 
+  // fetch alerts for selected route
   Future<void> _fetchAlerts() async {
+    _activeAlerts.clear();
+    List<AlertEntity> selectedAlerts = [];
     try {
       final alerts = await dataservice.fetchAlerts();
       if (alerts.isEmpty) return;
+      for (var alert in alerts) {
+        for (var r in alert.alert.informedEntity) {
+          if (r.routeId == _selectedRouteId) {
+            selectedAlerts.add(alert);
+          }
+        }}
       setState(() {
         _alerts = alerts;
+        _activeAlerts = selectedAlerts;
       });
     } catch (e) {
       debugPrint("Error loading alerts: $e");

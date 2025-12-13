@@ -82,8 +82,22 @@ class Dataservice {
     return results.whereType<gtfsRoute>().toList();
   }
 
+  // check if route has alerts
+  bool checkRouteAlerts(List<AlertEntity> alerts, String routeId) {
+    for (var alert in alerts) {
+      for (var r in alert.alert.informedEntity) {
+        if (r.routeId == routeId) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  // move to UI Service
   List<DropdownMenuItem<String>> buildRouteDropdownItems(
     List<gtfsRoute> routes,
+    List<AlertEntity> alerts,
   ) {
     return routes.map((route) {
       Color routeColor = Colors.black;
@@ -116,6 +130,20 @@ class Dataservice {
                 style: const TextStyle(fontSize: 14),
               ),
             ),
+            if (checkRouteAlerts(alerts, route.routeId))
+              GestureDetector(
+                onTap: () {
+                  debugPrint("Alert tapped for ${route.routeId}");
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  child: Icon(
+                    Icons.warning_amber_rounded,
+                    color: Colors.amber,
+                    size: 24,
+                  ),
+                ),
+              ),
           ],
         ),
       );
@@ -159,7 +187,11 @@ class Dataservice {
     return results.whereType<Trip>().toList();
   }
 
-    List<Polyline<Object>> buildTripPolyline(List<Shape> shapes, Color colorFromHex) {
+  // move to UI Service
+  List<Polyline<Object>> buildTripPolyline(
+    List<Shape> shapes,
+    Color colorFromHex,
+  ) {
     shapes.sort((a, b) => a.shapePtSequence.compareTo(b.shapePtSequence));
 
     final points = shapes
@@ -186,19 +218,20 @@ class Dataservice {
     return StopTime.fromJson(data);
   }
 
-  List<Marker> buildStopMarkers(List<StopTime> stopTimes, List<Stop> stops, Color colorFromHex) {
+  // move to UI Service
+  List<Marker> buildStopMarkers(
+    List<StopTime> stopTimes,
+    List<Stop> stops,
+    Color colorFromHex,
+  ) {
     List<Marker> newStopMarkers = [];
 
     for (var stop in stops) {
       final vehicleStopTime = stopTimes.firstWhere((s) {
         return s.stopId == stop.stopId;
       });
-      final convertedArrival = formatGtfsTime(
-        vehicleStopTime.arrivalTime,
-      );
-      final convertedDeparture = formatGtfsTime(
-        vehicleStopTime.departureTime,
-      );
+      final convertedArrival = formatGtfsTime(vehicleStopTime.arrivalTime);
+      final convertedDeparture = formatGtfsTime(vehicleStopTime.departureTime);
 
       newStopMarkers.add(
         Marker(
@@ -295,9 +328,9 @@ class Dataservice {
     }
 
     return newStopMarkers;
-
   }
 
+  // move to UI Service
   Color colorFromHex(String hexColor) {
     String color = hexColor.toUpperCase().replaceAll('#', '');
     if (color.length == 6) {
@@ -310,6 +343,7 @@ class Dataservice {
     }
   }
 
+  // move to UI Service
   String formatGtfsTime(String time24) {
     if (time24.isEmpty) return "";
 
@@ -332,9 +366,9 @@ class Dataservice {
 
     return "$hours:$minutes $period";
   }
-
 }
 
+// move to UI Service
 class VehiclePinIcon extends StatelessWidget {
   final Color iconColor;
   final IconData vehicleIconData;
@@ -353,9 +387,7 @@ class VehiclePinIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final double whiteCircleSize = size * 0.6;
     final double innerIconSize = size * 0.4;
-
-    // Adjust this to push the arrow further out or pull it in
-    final double arrowVerticalShift = -size * 0.25;
+    final double arrowVerticalShift = -size * 0.3;
 
     return Transform.rotate(
       angle: bearing,
@@ -503,16 +535,15 @@ class VehicleMarkerMenu extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
-                              stop?.stopName ?? "loading stop...",
-                              style: const TextStyle(
-                                color: Colors.black,
-                                fontSize: 12,
-                              ),
-                              textAlign: TextAlign.center,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            )
-                          ,
+                        stop?.stopName ?? "loading stop...",
+                        style: const TextStyle(
+                          color: Colors.black,
+                          fontSize: 12,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       Text(
                         "Status updated at $timestamp",
                         style: const TextStyle(
@@ -534,6 +565,7 @@ class VehicleMarkerMenu extends StatelessWidget {
     );
   }
 
+  // move to UI Service
   Widget _buildMenuButton({
     required IconData icon,
     required Color color,
@@ -549,4 +581,14 @@ class VehicleMarkerMenu extends StatelessWidget {
       ),
     );
   }
+}
+
+Widget buildAlertButton({required VoidCallback onTap}) {
+  return GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.all(8),
+      child: Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 24),
+    ),
+  );
 }

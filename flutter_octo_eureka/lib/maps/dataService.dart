@@ -1,8 +1,11 @@
 import 'dart:convert';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_octo_eureka/maps/gtfsTypes.dart';
 import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart';
 
 class Dataservice {
   static const String baseUrl =
@@ -156,6 +159,22 @@ class Dataservice {
     return results.whereType<Trip>().toList();
   }
 
+    List<Polyline<Object>> buildTripPolyline(List<Shape> shapes, Color colorFromHex) {
+    shapes.sort((a, b) => a.shapePtSequence.compareTo(b.shapePtSequence));
+
+    final points = shapes
+        .map((s) => LatLng(s.shapePtLat, s.shapePtLon))
+        .toList();
+
+    final polyline = Polyline(
+      points: points,
+      strokeWidth: 4.0,
+      color: colorFromHex,
+    );
+
+    return [polyline];
+  }
+
   // STOP TIMES
   Future<List<StopTime>> fetchStopTimesByTripId(String tripId) async {
     final data = await _get('/stoptimes/trip/$tripId');
@@ -165,6 +184,118 @@ class Dataservice {
   Future<StopTime> fetchStopTimeByIds(String tripId, String stopId) async {
     final data = await _get('/stoptimes/trip/$tripId/stop/$stopId');
     return StopTime.fromJson(data);
+  }
+
+  List<Marker> buildStopMarkers(List<StopTime> stopTimes, List<Stop> stops, Color colorFromHex) {
+    List<Marker> newStopMarkers = [];
+
+    for (var stop in stops) {
+      final vehicleStopTime = stopTimes.firstWhere((s) {
+        return s.stopId == stop.stopId;
+      });
+      final convertedArrival = formatGtfsTime(
+        vehicleStopTime.arrivalTime,
+      );
+      final convertedDeparture = formatGtfsTime(
+        vehicleStopTime.departureTime,
+      );
+
+      newStopMarkers.add(
+        Marker(
+          point: LatLng(stop.stopLat, stop.stopLon),
+          width: 200.0,
+          height: 175.0,
+          alignment: Alignment.center,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(6),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      blurRadius: 2,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      stop.stopName,
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      "Scheduled",
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      "arrival: $convertedArrival,",
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      "departure: $convertedDeparture",
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: colorFromHex, width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.2),
+                      blurRadius: 2,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return newStopMarkers;
+
   }
 
   Color colorFromHex(String hexColor) {
@@ -266,6 +397,155 @@ class VehiclePinIcon extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class VehicleMarkerMenu extends StatelessWidget {
+  final Widget child;
+  final bool isBus;
+  final int? status;
+  final Stop? stop;
+  final String? headsign;
+  final String? timestamp;
+  final VoidCallback onCompassPressed;
+  final VoidCallback onWarningPressed;
+  final VoidCallback onInfoPressed;
+
+  const VehicleMarkerMenu({
+    super.key,
+    required this.child,
+    required this.isBus,
+    required this.headsign,
+    required this.timestamp,
+    required this.status,
+    required this.stop,
+    required this.onCompassPressed,
+    required this.onWarningPressed,
+    required this.onInfoPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const double buttonSize = 40.0;
+    String statusString;
+    if (status == 0) {
+      statusString = "Arriving at";
+    } else if (status == 1) {
+      statusString = "Stopped at";
+    } else {
+      statusString = "In transit to";
+    }
+
+    return Stack(
+      alignment: Alignment.center,
+      clipBehavior: Clip.none,
+      children: [
+        child,
+        Positioned(
+          top: 75,
+
+          child: Container(
+            padding: const EdgeInsets.all(8.0),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: .2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+                child: Container(
+                  color: Colors.white.withValues(alpha: 0.4),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 8,
+                    horizontal: 4,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      headsign != null && headsign!.isNotEmpty
+                          ? Container(
+                              padding: const EdgeInsets.all(8.0),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Text(
+                                isBus
+                                    ? "${headsign!} bus"
+                                    : "${headsign!} train",
+                                style: const TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            )
+                          : SizedBox(),
+                      Text(
+                        statusString,
+                        style: const TextStyle(
+                          color: Colors.black,
+                          fontSize: 12,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                              stop?.stopName ?? "loading stop...",
+                              style: const TextStyle(
+                                color: Colors.black,
+                                fontSize: 12,
+                              ),
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            )
+                          ,
+                      Text(
+                        "Status updated at $timestamp",
+                        style: const TextStyle(
+                          color: Colors.black,
+                          fontSize: 10,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMenuButton({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+    required double size,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(8.0),
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(16)),
+        child: Icon(icon, color: color, size: 24),
       ),
     );
   }

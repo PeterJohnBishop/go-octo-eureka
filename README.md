@@ -1,3 +1,19 @@
+# flutter_octo_eureka
+
+To get started, select a route from the dropdown menu to see the real time location of buses or trains that run that route. Their direction of travel is indicated by the red arrow on the marker. 
+
+![SelectARoute](https://github.com/PeterJohnBishop/go-octo-eureka/blob/main/README%20Assets/SelectARoute.gif?raw=true)
+
+If there are any service alerts for that route a yellow caution icon will be shown. Tap it to view the alert messages.
+
+![ViewAlerts](https://github.com/PeterJohnBishop/go-octo-eureka/blob/main/README%20Assets/ViewAlerts.gif?raw=true)
+
+To see the route traveled by a bus or train, tap it once to see the route on the map with indicators for each stop.
+Tap any stop to see stop details including the scheduled arrival and departure time. Tap the details to dismiss them.
+Tap on the vehicle to see it's headsign, current status, and the time it was last updated.
+
+![ViewTripDetails](https://github.com/PeterJohnBishop/go-octo-eureka/blob/main/README%20Assets/ViewTripDetails.gif?raw=true)
+
 # go-octo-eureka
 
 A server providing a REST API to consume GTFS data from RTD, direction and geolocation services from GoogleMaps, and email notifications via Resend.

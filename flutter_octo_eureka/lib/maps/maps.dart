@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_octo_eureka/maps/dataService.dart';
 import 'package:flutter_octo_eureka/maps/gtfsTypes.dart';
+import 'package:flutter_octo_eureka/maps/userInterfaceService.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -20,6 +21,7 @@ class MapView extends StatefulWidget {
 
 class _MapViewState extends State<MapView> {
   final Dataservice dataservice = Dataservice();
+  final UserInterfaceService uiService = UserInterfaceService();
 
   List<VehiclePositionEntity> _vehiclePositions = [];
   List<VehiclePositionEntity> _selectedVehicles = [];
@@ -92,7 +94,7 @@ class _MapViewState extends State<MapView> {
       }
       final cleanRoutesList = uniqueRoutes.values.toList();
 
-      final menuItems = dataservice.buildRouteDropdownItems(context, _routes, _alerts);
+      final menuItems = uiService.buildRouteDropdownItems(context, _routes, _alerts);
 
       if (mounted) {
         setState(() {
@@ -199,11 +201,11 @@ class _MapViewState extends State<MapView> {
           _stopTimes = stopTimes;
           _shapes = shapes;
           _stops = stops;
-          _activePolylines = dataservice.buildTripPolyline(
+          _activePolylines = uiService.buildTripPolyline(
             shapes,
             colorFromHex,
           );
-          _stopMarkers = dataservice.buildStopMarkers(
+          _stopMarkers = uiService.buildStopMarkers(
             _stopTimes,
             stops,
             colorFromHex,
@@ -242,7 +244,7 @@ class _MapViewState extends State<MapView> {
 
       final bearing = vehicle.vehicle.position.bearing;
       final double bearingRadians = bearing * (pi / 180);
-      final Color iconColor = dataservice.colorFromHex(route.routeColor);
+      final Color iconColor = uiService.colorFromHex(route.routeColor);
 
       final unixTimestamp = vehicle.vehicle.timestamp;
       final DateTime date = DateTime.fromMillisecondsSinceEpoch(

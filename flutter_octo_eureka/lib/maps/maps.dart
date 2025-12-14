@@ -78,6 +78,7 @@ class _MapViewState extends State<MapView> {
       }
 
       await _fetchAlerts();
+      await Future.delayed(Duration.zero);
 
       final List<gtfsRoute> rawRoutes = await dataservice.loadVehicleRoutes(
         positions,
@@ -199,7 +200,17 @@ class _MapViewState extends State<MapView> {
       if (mounted) {
         setState(() {
           _stopTimes = stopTimes;
-          _shapes = shapes;
+         List<Shape> optimizedShapes = shapes;
+          if (shapes.length > 500) {
+            optimizedShapes = [];
+            for (int i = 0; i < shapes.length; i++) {
+              // Keep first, last, and every nth point
+              if (i == 0 || i == shapes.length - 1 || i % 3 == 0) {
+                optimizedShapes.add(shapes[i]);
+              }
+            }
+          }
+          _shapes = optimizedShapes;
           _stops = stops;
           _activePolylines = uiService.buildTripPolyline(shapes, colorFromHex);
           _stopMarkers = uiService.buildStopMarkers(
@@ -221,8 +232,8 @@ class _MapViewState extends State<MapView> {
   void _showVehicles() {
     _vehicleMarkers.clear();
     _mappededVehiclePositions.clear();
-    
-    VehiclePositionEntity? targetVehicleToZoom; 
+
+    VehiclePositionEntity? targetVehicleToZoom;
 
     for (var vehicle in _selectedVehicles) {
       final lat = vehicle.vehicle.position.latitude;
@@ -327,8 +338,8 @@ class _MapViewState extends State<MapView> {
       if (targetVehicleToZoom != null) {
         var vlong = targetVehicleToZoom!.vehicle.position.longitude;
         var vlat = targetVehicleToZoom!.vehicle.position.latitude;
-        
-        _mapController.move(LatLng(vlat, vlong), 14.0); 
+
+        _mapController.move(LatLng(vlat, vlong), 14.0);
       } else {
         _zoomToFit(_mappededVehiclePositions);
       }
@@ -388,10 +399,24 @@ class _MapViewState extends State<MapView> {
 
   void _zoomToFit(List<LatLng> positions) {
     if (positions.isEmpty) return;
-    final bounds = LatLngBounds.fromPoints(positions);
-    _mapController.fitCamera(
-      CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(50.0)),
-    );
+
+    if (positions.length == 1 ||
+        positions.every(
+          (p) =>
+              p.latitude == positions.first.latitude &&
+              p.longitude == positions.first.longitude,
+        )) {
+      _mapController.move(positions.first, 14.0);
+      return;
+    }
+    try {
+      final bounds = LatLngBounds.fromPoints(positions);
+      _mapController.fitCamera(
+        CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(50.0)),
+      );
+    } catch (e) {
+      debugPrint("Zoom error: $e");
+    }
   }
 
   @override
@@ -468,7 +493,10 @@ class _MapViewState extends State<MapView> {
                 userAgentPackageName: 'com.flutter_octo_eureka.app',
               ),
               _activePolylines.isNotEmpty
-                  ? PolylineLayer(polylines: _activePolylines)
+                  ? PolylineLayer(
+                      polylines: _activePolylines,
+                      cullingMargin: 50.0,
+                    )
                   : Container(),
               _vehicleMarkers.isNotEmpty
                   ? MarkerLayer(

@@ -24,7 +24,7 @@ class _MapViewState extends State<MapView> {
   final UserInterfaceService uiService = UserInterfaceService();
 
   List<VehiclePositionEntity> _vehiclePositions = [];
-  List<VehiclePositionEntity> _selectedVehicles = [];
+  List<VehiclePositionEntity> _selectedVehicles = []; // via dropdown
   List<LatLng> _mappededVehiclePositions = [];
   List<LatLng> _mappedStopPositions = [];
   List<AlertEntity> _alerts = [];
@@ -80,7 +80,7 @@ class _MapViewState extends State<MapView> {
         if (mounted) setState(() => _isLoading = false);
         return;
       }
-      _fetchAlerts();
+      _fetchAlerts(); // populate warning icon shown on each route in the dropdown that has a service alert
 
       final List<gtfsRoute> rawRoutes = await dataservice.loadVehicleRoutes(
         positions,

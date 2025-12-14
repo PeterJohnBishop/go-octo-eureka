@@ -184,9 +184,22 @@ class UserInterfaceService {
     List<Marker> newStopMarkers = [];
 
     for (var stop in stops) {
-      final vehicleStopTime = stopTimes.firstWhere((s) {
-        return s.stopId == stop.stopId;
-      });
+      final vehicleStopTime = stopTimes.firstWhere(
+        (s) => s.stopId == stop.stopId,
+        orElse: () => StopTime(
+          tripId: '',
+          arrivalTime: 'N/A',
+          departureTime: 'N/A',
+          stopId: '',
+          stopSequence: 0,
+          stopHeadsign: '',
+          pickupType: 0,
+          dropOffType: 0,
+          shapeDistTraveled: 0.0,
+          timepoint: 0,
+        ),
+      );
+
       final convertedArrival = formatGtfsTime(vehicleStopTime.arrivalTime);
       final convertedDeparture = formatGtfsTime(vehicleStopTime.departureTime);
 
@@ -196,89 +209,11 @@ class UserInterfaceService {
           width: 200.0,
           height: 175.0,
           alignment: Alignment.center,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(6),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      blurRadius: 2,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Text(
-                      stop.stopName,
-                      style: const TextStyle(
-                        color: Colors.black,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(
-                      "Scheduled",
-                      style: const TextStyle(
-                        color: Colors.black,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(
-                      "arrival: $convertedArrival,",
-                      style: const TextStyle(
-                        color: Colors.black,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(
-                      "departure: $convertedDeparture",
-                      style: const TextStyle(
-                        color: Colors.black,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10),
-              Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: colorFromHex, width: 2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.2),
-                      blurRadius: 2,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          child: StopMarkerPopup(
+            stopName: stop.stopName,
+            arrivalTime: convertedArrival,
+            departureTime: convertedDeparture,
+            color: colorFromHex,
           ),
         ),
       );
@@ -367,7 +302,7 @@ class VehiclePinIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final double whiteCircleSize = size * 0.6;
     final double innerIconSize = size * 0.4;
-    final double arrowVerticalShift = -size * 0.3;
+    final double arrowVerticalShift = -size * 0.275;
 
     return Transform.rotate(
       angle: bearing,
@@ -387,7 +322,7 @@ class VehiclePinIcon extends StatelessWidget {
                 shadows: [
                   Shadow(
                     blurRadius: 2.0,
-                    color: Colors.black.withOpacity(0.3),
+                    color: Colors.black.withValues(alpha: 0.3),
                     offset: const Offset(0, 1),
                   ),
                 ],
@@ -414,7 +349,7 @@ class VehiclePinIcon extends StatelessWidget {
   }
 }
 
-class VehicleMarkerMenu extends StatelessWidget {
+class VehicleMarkerMenu extends StatefulWidget {
   final Widget child;
   final bool isBus;
   final int? status;
@@ -439,109 +374,272 @@ class VehicleMarkerMenu extends StatelessWidget {
   });
 
   @override
+  State<VehicleMarkerMenu> createState() => _VehicleMarkerMenuState();
+}
+
+class _VehicleMarkerMenuState extends State<VehicleMarkerMenu> {
+  bool _showDetail = false;
+
+  @override
   Widget build(BuildContext context) {
-    const double buttonSize = 40.0;
+    const double buttonSize = 40.0; // for buttons
     String statusString;
-    if (status == 0) {
+    if (widget.status == 0) {
       statusString = "Arriving at";
-    } else if (status == 1) {
+    } else if (widget.status == 1) {
       statusString = "Stopped at";
     } else {
       statusString = "In transit to";
     }
 
-    return Stack(
-      alignment: Alignment.center,
-      clipBehavior: Clip.none,
-      children: [
-        child,
-        Positioned(
-          top: 75,
+    return SizedBox(
+      width: double.infinity,
+      height: double.infinity,
+      child: Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.none,
+        children: [
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _showDetail = !_showDetail;
+              });
+            },
 
-          child: Container(
-            padding: const EdgeInsets.all(8.0),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: .2),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+            child: widget.child,
+          ),
+
+          if (_showDetail)
+            Positioned(
+              top: 75,
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _showDetail = false;
+                  });
+                },
                 child: Container(
-                  color: Colors.white.withValues(alpha: 0.4),
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 8,
-                    horizontal: 4,
+                  padding: const EdgeInsets.all(8.0),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: .2),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      headsign != null && headsign!.isNotEmpty
-                          ? Container(
-                              padding: const EdgeInsets.all(8.0),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(16),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+                      child: Container(
+                        color: Colors.white.withValues(alpha: 0.4),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 8,
+                          horizontal: 4,
+                        ),
+                        constraints: const BoxConstraints(maxWidth: 180),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            widget.headsign != null &&
+                                    widget.headsign!.isNotEmpty
+                                ? Container(
+                                    padding: const EdgeInsets.all(8.0),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    child: Text(
+                                      widget.isBus
+                                          ? "${widget.headsign!} bus"
+                                          : "${widget.headsign!} train",
+                                      style: const TextStyle(
+                                        color: Colors.black,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  )
+                                : const SizedBox(),
+                            Text(
+                              statusString,
+                              style: const TextStyle(
+                                color: Colors.black,
+                                fontSize: 12,
                               ),
-                              child: Text(
-                                isBus
-                                    ? "${headsign!} bus"
-                                    : "${headsign!} train",
-                                style: const TextStyle(
-                                  color: Colors.black,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              widget.stop?.stopName ?? "loading stop...",
+                              style: const TextStyle(
+                                color: Colors.black,
+                                fontSize: 12,
                               ),
-                            )
-                          : SizedBox(),
-                      Text(
-                        statusString,
-                        style: const TextStyle(
-                          color: Colors.black,
-                          fontSize: 12,
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              "Status updated at ${widget.timestamp}",
+                              style: const TextStyle(
+                                color: Colors.black,
+                                fontSize: 10,
+                              ),
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ),
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                       ),
-                      Text(
-                        stop?.stopName ?? "loading stop...",
-                        style: const TextStyle(
-                          color: Colors.black,
-                          fontSize: 12,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class StopMarkerPopup extends StatefulWidget {
+  final String stopName;
+  final String arrivalTime;
+  final String departureTime;
+  final Color color;
+
+  const StopMarkerPopup({
+    super.key,
+    required this.stopName,
+    required this.arrivalTime,
+    required this.departureTime,
+    required this.color,
+  });
+
+  @override
+  State<StopMarkerPopup> createState() => _StopMarkerPopupState();
+}
+
+class _StopMarkerPopupState extends State<StopMarkerPopup> {
+  bool _showDetail = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double bottomSpacer = (constraints.maxHeight / 2) - 7.0;
+
+        return Container(
+          width: double.infinity,
+          height: double.infinity,
+          alignment: Alignment.bottomCenter,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_showDetail)
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _showDetail = false;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 3,
+                    ),
+                    margin: const EdgeInsets.only(bottom: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: widget.color, width: 1.5),
+                      borderRadius: BorderRadius.circular(6),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          blurRadius: 2,
+                          offset: const Offset(0, 1),
                         ),
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        "Status updated at $timestamp",
-                        style: const TextStyle(
-                          color: Colors.black,
-                          fontSize: 10,
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          widget.stopName,
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                        const Text(
+                          "Scheduled",
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          "arrival: ${widget.arrivalTime},",
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontSize: 10,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        Text(
+                          "departure: ${widget.departureTime}",
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontSize: 10,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _showDetail = !_showDetail;
+                  });
+                },
+                child: Container(
+                  width: 14,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: widget.color, width: 3),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 2,
+                        offset: const Offset(0, 1),
                       ),
                     ],
                   ),
                 ),
               ),
-            ),
+              SizedBox(height: bottomSpacer),
+            ],
           ),
-        ),
-      ],
+        );
+      },
     );
   }
 }

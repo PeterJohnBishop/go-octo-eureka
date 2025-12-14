@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math';
 import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_octo_eureka/maps/dataService.dart';
@@ -22,7 +21,6 @@ class MapView extends StatefulWidget {
 class _MapViewState extends State<MapView> {
   final Dataservice dataservice = Dataservice();
   final UserInterfaceService uiService = UserInterfaceService();
-
   List<VehiclePositionEntity> _vehiclePositions = [];
   List<VehiclePositionEntity> _selectedVehicles = []; // via dropdown
   List<LatLng> _mappededVehiclePositions = [];
@@ -39,11 +37,9 @@ class _MapViewState extends State<MapView> {
   List<Polyline> _activePolylines = [];
   List<Marker> _activeMarkers = [];
   List<Marker> _stopMarkers = [];
-
   bool _isLoading = true;
   String? _selectedRouteId;
   String? _selectedVehicleId;
-
   Timer? _updateTimer;
   MapController _mapController = MapController();
   Marker? _userLocationMarker;
@@ -80,7 +76,8 @@ class _MapViewState extends State<MapView> {
         if (mounted) setState(() => _isLoading = false);
         return;
       }
-      _fetchAlerts(); // populate warning icon shown on each route in the dropdown that has a service alert
+
+      await _fetchAlerts();
 
       final List<gtfsRoute> rawRoutes = await dataservice.loadVehicleRoutes(
         positions,
@@ -94,7 +91,11 @@ class _MapViewState extends State<MapView> {
       }
       final cleanRoutesList = uniqueRoutes.values.toList();
 
-      final menuItems = uiService.buildRouteDropdownItems(context, _routes, _alerts);
+      final menuItems = uiService.buildRouteDropdownItems(
+        context,
+        cleanRoutesList,
+        _alerts,
+      );
 
       if (mounted) {
         setState(() {
@@ -131,7 +132,8 @@ class _MapViewState extends State<MapView> {
           if (r.routeId == _selectedRouteId) {
             selectedAlerts.add(alert);
           }
-        }}
+        }
+      }
       setState(() {
         _alerts = alerts;
         _activeAlerts = selectedAlerts;
@@ -185,11 +187,9 @@ class _MapViewState extends State<MapView> {
 
       _mappedStopPositions.clear();
       for (var shape in shapes) {
-        _mappedStopPositions.add(
-          LatLng(shape.shapePtLat, shape.shapePtLon),
-        );
+        _mappedStopPositions.add(LatLng(shape.shapePtLat, shape.shapePtLon));
       }
-      
+
       var stops = <Stop>[];
       if (stopTimes.isNotEmpty) {
         stops = await Future.wait(
@@ -201,16 +201,13 @@ class _MapViewState extends State<MapView> {
           _stopTimes = stopTimes;
           _shapes = shapes;
           _stops = stops;
-          _activePolylines = uiService.buildTripPolyline(
-            shapes,
-            colorFromHex,
-          );
+          _activePolylines = uiService.buildTripPolyline(shapes, colorFromHex);
           _stopMarkers = uiService.buildStopMarkers(
             _stopTimes,
             stops,
             colorFromHex,
           );
-          _zoomToFit(_mappedStopPositions);
+          // _zoomToFit(_mappedStopPositions);
           _isLoading = false;
         });
         _showVehicles();
@@ -224,11 +221,19 @@ class _MapViewState extends State<MapView> {
   void _showVehicles() {
     _vehicleMarkers.clear();
     _mappededVehiclePositions.clear();
+    
+    VehiclePositionEntity? targetVehicleToZoom; 
 
     for (var vehicle in _selectedVehicles) {
       final lat = vehicle.vehicle.position.latitude;
       final lon = vehicle.vehicle.position.longitude;
       _mappededVehiclePositions.add(LatLng(lat, lon));
+
+      final bool isSelectedCurrent = _selectedVehicleId == vehicle.id;
+
+      if (isSelectedCurrent) {
+        targetVehicleToZoom = vehicle;
+      }
 
       final route = _routes.firstWhere(
         (route) => route.routeId == _selectedRouteId,
@@ -252,8 +257,6 @@ class _MapViewState extends State<MapView> {
       );
       final String formattedTime = DateFormat('h:mm a').format(date);
 
-      final bool isSelected = _selectedVehicleId == vehicle.id;
-
       Widget markerContent = VehiclePinIcon(
         iconColor: iconColor,
         vehicleIconData: iconData,
@@ -261,10 +264,10 @@ class _MapViewState extends State<MapView> {
         bearing: bearingRadians,
       );
 
-      if (isSelected) {
+      if (isSelectedCurrent) {
         final trip = _trips.firstWhere(
           (t) => t.tripId == vehicle.vehicle.trip.tripId,
-          orElse: () => _trips.first, 
+          orElse: () => _trips.first,
         );
 
         Stop? currentStop;
@@ -281,12 +284,10 @@ class _MapViewState extends State<MapView> {
           headsign: trip.tripHeadsign,
           timestamp: formattedTime,
           status: vehicle.vehicle.currentStatus,
-          stop: currentStop, // Passing null here is okay now
-          onCompassPressed: () =>
-              debugPrint("Compass tapped for ${vehicle.id}"),
-          onWarningPressed: () =>
-              debugPrint("Warning tapped for ${vehicle.id}"),
-          onInfoPressed: () => debugPrint("Info tapped for ${vehicle.id}"),
+          stop: currentStop,
+          onCompassPressed: () => debugPrint("Compass tapped"),
+          onWarningPressed: () => debugPrint("Warning tapped"),
+          onInfoPressed: () => debugPrint("Info tapped"),
           child: markerContent,
         );
       } else {
@@ -307,7 +308,7 @@ class _MapViewState extends State<MapView> {
         );
       }
 
-      final double baseSize = isSelected ? 120.0 : 50.0;
+      final double baseSize = isSelectedCurrent ? 120.0 : 50.0;
 
       _vehicleMarkers.add(
         Marker(
@@ -322,7 +323,15 @@ class _MapViewState extends State<MapView> {
 
     setState(() {
       _activeMarkers = [..._stopMarkers, ..._vehicleMarkers];
-      _zoomToFit(_mappededVehiclePositions);
+
+      if (targetVehicleToZoom != null) {
+        var vlong = targetVehicleToZoom!.vehicle.position.longitude;
+        var vlat = targetVehicleToZoom!.vehicle.position.latitude;
+        
+        _mapController.move(LatLng(vlat, vlong), 14.0); 
+      } else {
+        _zoomToFit(_mappededVehiclePositions);
+      }
       _isLoading = false;
     });
   }
@@ -331,17 +340,14 @@ class _MapViewState extends State<MapView> {
     bool serviceEnabled;
     LocationPermission permission;
 
-    // 1. Check if GPS service is enabled
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       debugPrint('Location services are disabled.');
       return;
     }
 
-    // 2. Check current permission status
     permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
-      // 3. Request permission if denied
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
         debugPrint('Location permissions are denied');
@@ -354,7 +360,6 @@ class _MapViewState extends State<MapView> {
       return;
     }
 
-    // 4. Get the position
     var position = await Geolocator.getCurrentPosition();
     _updateUserMarker(position);
   }
@@ -382,31 +387,27 @@ class _MapViewState extends State<MapView> {
   }
 
   void _zoomToFit(List<LatLng> positions) {
-  if (positions.isEmpty) return;
-  final bounds = LatLngBounds.fromPoints(positions);
-  _mapController.fitCamera(
-    CameraFit.bounds(
-      bounds: bounds,
-      padding: const EdgeInsets.all(50.0), 
-    ),
-  );
-}
+    if (positions.isEmpty) return;
+    final bounds = LatLngBounds.fromPoints(positions);
+    _mapController.fitCamera(
+      CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(50.0)),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       floatingActionButton: Column(
-        mainAxisAlignment:
-            MainAxisAlignment.end, 
+        mainAxisAlignment: MainAxisAlignment.end,
         children: [
           FloatingActionButton.small(
-            heroTag: "zoom_in", 
+            heroTag: "zoom_in",
             onPressed: _zoomIn,
             backgroundColor: Colors.white,
             foregroundColor: Colors.black,
             child: const Icon(Icons.add),
           ),
-          const SizedBox(height: 8), 
+          const SizedBox(height: 8),
           FloatingActionButton.small(
             heroTag: "zoom_out",
             onPressed: _zoomOut,
@@ -469,7 +470,6 @@ class _MapViewState extends State<MapView> {
               _activePolylines.isNotEmpty
                   ? PolylineLayer(polylines: _activePolylines)
                   : Container(),
-              // PolylineLayer(polylines: _activePolylines),
               _vehicleMarkers.isNotEmpty
                   ? MarkerLayer(
                       markers: [
@@ -480,7 +480,6 @@ class _MapViewState extends State<MapView> {
                   : _userLocationMarker != null
                   ? MarkerLayer(markers: [_userLocationMarker!])
                   : Container(),
-              // MarkerLayer(markers: _vehicleMarkers,
               RichAttributionWidget(
                 alignment: AttributionAlignment.bottomLeft,
                 attributions: [
@@ -522,7 +521,6 @@ class _MapViewState extends State<MapView> {
                               underline: Container(),
                               onChanged: (value) {
                                 setState(() {
-                                  // clear any previous selections
                                   _selectedVehicles = [];
                                   _trips = [];
                                   _stopTimes = [];

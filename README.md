@@ -1,5 +1,7 @@
 # flutter_octo_eureka
 
+### currently testing on iOS and Android devices
+
 To get started, select a route from the dropdown menu to see the real time location of buses or trains that run that route. Their direction of travel is indicated by the red arrow on the vehicle marker. 
 
 ![SelectARoute](https://github.com/PeterJohnBishop/go-octo-eureka/blob/main/README%20Assets/SelectARoute.gif?raw=true)

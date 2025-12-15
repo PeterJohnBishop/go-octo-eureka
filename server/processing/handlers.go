@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/umahmood/haversine"
 )
 
 // GET /vehiclepositions
@@ -173,6 +174,11 @@ func HandleTripUpdate(c *gin.Context) {
 	c.JSON(http.StatusOK, results)
 }
 
+// GET /shapes
+func HandleShapes(c *gin.Context) {
+	c.JSON(http.StatusOK, Shapes)
+}
+
 // GET /shapes/:id
 func HandleShapesById(c *gin.Context) {
 	id := c.Param("id")
@@ -186,6 +192,11 @@ func HandleShapesById(c *gin.Context) {
 	} else {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Shape not found"})
 	}
+}
+
+// GET /stoptimes
+func HandleStopTimes(c *gin.Context) {
+	c.JSON(http.StatusOK, StopTimes)
 }
 
 // GET /stoptimes/trip/:trip_id
@@ -221,6 +232,11 @@ func HandleStopTimesByIds(c *gin.Context) {
 	}
 }
 
+// GET /routes
+func HandleRoutes(c *gin.Context) {
+	c.JSON(http.StatusOK, Routes)
+}
+
 // GET /routes/:id
 func HandleRoutesById(c *gin.Context) {
 	id := c.Param("id")
@@ -229,6 +245,11 @@ func HandleRoutesById(c *gin.Context) {
 	} else {
 		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("Route with ID %s not found", id)})
 	}
+}
+
+// GET /stops
+func HandleStops(c *gin.Context) {
+	c.JSON(http.StatusOK, Stops)
 }
 
 // GET /stops/:id
@@ -241,6 +262,11 @@ func HandleStopsById(c *gin.Context) {
 	}
 }
 
+// GET /trips
+func HandleTrips(c *gin.Context) {
+	c.JSON(http.StatusOK, Trips)
+}
+
 // GET /trips/:id
 func HandleTripsById(c *gin.Context) {
 	id := c.Param("id")
@@ -249,4 +275,224 @@ func HandleTripsById(c *gin.Context) {
 	} else {
 		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("Trip with ID %s not found", id)})
 	}
+}
+
+
+type LocationParams struct {
+    Lat  float64 `form:"lat" binding:"required"`
+    Long float64 `form:"long" binding:"required"`
+}
+
+// GET /routes/near?:lat&:long
+func HandleNearLines(c *gin.Context) {	
+	var params LocationParams
+
+	if err := c.ShouldBindQuery(&params); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+	
+	// find near by stops
+	nearStops := _FindStopsWithinXMiles(params.Lat, params.Long, 5.0, Stops)
+	// find stopTimes for nearStops
+	stopTimes := _FindStopTimesForEachStop(nearStops, StopTimes)
+	// find trips for stopTimes
+	trips := _FindTripsForEachStopTime(stopTimes, Trips)
+	// find shapes for trips
+	shapes := _FindShapesForEachTrip(trips, Shapes)
+	// find route color for shapes
+
+	c.JSON(http.StatusOK, shapes)
+
+}
+
+// GET /stops/near?:lat&:long
+func HandleNearStops(c *gin.Context) {
+	var params LocationParams
+
+	if err := c.ShouldBindQuery(&params); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+	
+	nearStops := _FindStopsWithinXMiles(params.Lat, params.Long, 5.0, Stops)
+
+	c.JSON(http.StatusOK, nearStops);
+}
+
+func _FindStopsWithinXMiles(userLat, userLon float64, miles float64, allStops []Stop) []Stop {
+    radiusMiles := miles;
+
+    latDiff := radiusMiles / 69.0
+    lonDiff := radiusMiles / 50.0 
+
+    minLat, maxLat := userLat - latDiff, userLat + latDiff
+    minLon, maxLon := userLon - lonDiff, userLon + lonDiff
+
+    nearbyStops := make([]Stop, 0, 20)
+
+    userCoord := haversine.Coord{Lat: userLat, Lon: userLon}
+
+    for i := range allStops {
+        s := &allStops[i] 
+
+        if s.StopLat > maxLat || s.StopLat < minLat {
+            continue
+        }
+        if s.StopLon > maxLon || s.StopLon < minLon {
+            continue
+        }
+
+        stopCoord := haversine.Coord{Lat: s.StopLat, Lon: s.StopLon}
+        mi, _ := haversine.Distance(userCoord, stopCoord)
+
+        if mi <= radiusMiles {
+            nearbyStops = append(nearbyStops, *s)
+        }
+    }
+
+    return nearbyStops
+}
+
+func _FindStopTimesForEachStop(nearStops []Stop, allStopTimes []StopTime) []StopTime {
+    results := make([]StopTime, 0, len(nearStops)*2)
+
+    for i := range nearStops {
+        stop := &nearStops[i] 
+        targetID := stop.StopID
+
+        idx := sort.Search(len(allStopTimes), func(j int) bool {
+            return allStopTimes[j].StopID >= targetID
+        })
+
+        for k := idx; k < len(allStopTimes); k++ {
+            st := &allStopTimes[k] 
+
+            if st.StopID != targetID {
+                break 
+            }
+            
+            results = append(results, *st)
+        }
+    }
+    return results
+}
+
+func _FindTripsForEachStopTime(stopTimes []StopTime, allTrips []Trip) []Trip {
+    results := make([]Trip, 0, len(stopTimes))
+    
+    seenTrips := make(map[string]bool) 
+
+    for i := range stopTimes {
+        st := &stopTimes[i]
+        targetTripID := st.TripID
+
+        if seenTrips[targetTripID] {
+            continue
+        }
+
+        idx := sort.Search(len(allTrips), func(j int) bool {
+            return allTrips[j].TripID >= targetTripID
+        })
+
+        if idx < len(allTrips) {
+            t := &allTrips[idx]
+            if t.TripID == targetTripID {
+                seenTrips[targetTripID] = true
+                results = append(results, *t)
+            }
+        }
+    }
+    return results
+}
+
+func _FindShapesForEachTrip(trips []Trip, allShapes []Shape) []Shape {
+    results := make([]Shape, 0, len(trips)*100)
+    
+    seenShapes := make(map[string]bool)
+
+    for i := range trips {
+        t := &trips[i]
+        targetShapeID := t.ShapeID
+
+        if seenShapes[targetShapeID] || targetShapeID == "" {
+            continue
+        }
+        seenShapes[targetShapeID] = true
+
+        idx := sort.Search(len(allShapes), func(j int) bool {
+            return allShapes[j].ShapeID >= targetShapeID
+        })
+
+        for k := idx; k < len(allShapes); k++ {
+            s := &allShapes[k]
+
+            if s.ShapeID != targetShapeID {
+                break 
+            }
+            results = append(results, *s)
+        }
+    }
+    return results
+}
+
+type ShapeColor struct {
+		ShapeID string
+		TripID string
+		RouteID string
+	}
+
+func _FindRouteColorForEachShape(shapes []Shape, allTrips []Trip, allRoutes []Route) []ShapeColor {
+
+	colors := make([]ShapeColor, 0, len(shapes))
+
+	for _, shape := range shapes {
+		for _, trip := range allTrips {
+			if trip.ShapeID == shape.ShapeID {
+				for _, route := range allRoutes {
+					if route.RouteID == trip.RouteID {
+						colors = append(colors, ShapeColor{
+							ShapeID: *shape.ShapeID,
+							TripID: *trip.TripID,
+							RouteID: *route.RouteID,
+						})
+					}
+				}
+			}
+		}
+	}
+	return colors
+}
+
+func _FindRouteColorForEachTrip(foundTrips []Trip, allRoutes []Route) []ShapeColor {
+    
+    results := make([]ShapeColor, 0, len(foundTrips))
+    
+    seenShapes := make(map[string]bool)
+
+    for i := range foundTrips {
+        t := &foundTrips[i]
+        
+        if seenShapes[t.ShapeID] {
+            continue
+        }
+
+        idx := sort.Search(len(allRoutes), func(j int) bool {
+            return allRoutes[j].RouteID >= t.RouteID
+        })
+
+        if idx < len(allRoutes) {
+            r := &allRoutes[idx]
+            if r.RouteID == t.RouteID {
+                seenShapes[t.ShapeID] = true
+                
+                results = append(results, ShapeColor{
+                    ShapeID: t.ShapeID,
+                    TripID:  t.TripID,
+                    RouteID: r.RouteID,
+                })
+            }
+        }
+    }
+    return results
 }

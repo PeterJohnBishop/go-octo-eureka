@@ -28,6 +28,7 @@ func Route(client *maps.Client, origin string, destination string) ([]maps.Route
 		Origin:      "Sydney",
 		Destination: "Perth",
 	}
+
 	route, _, err := client.Directions(context.Background(), req)
 	if err != nil {
 		return nil, err

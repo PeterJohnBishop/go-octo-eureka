@@ -92,6 +92,46 @@ class _MapViewState extends State<MapView> {
       }
       final cleanRoutesList = uniqueRoutes.values.toList();
 
+cleanRoutesList.sort((a, b) {
+
+  String getKey(String fullString) {
+    if (fullString.isEmpty) return "";
+    final index = fullString.indexOf(':');
+    if (index == -1) return fullString.trim();
+    return fullString.substring(0, index).trim();
+  }
+
+  bool isNumeric(String s) => RegExp(r'^\d').hasMatch(s);
+  bool isSingleLetter(String s) => s.length == 1 && !isNumeric(s);
+
+  int getRank(String key) {
+    if (isSingleLetter(key)) return 2; 
+    if (isNumeric(key)) return 1;      
+    return 0;                          
+  }
+
+  String keyA = getKey(a.routeShortName);
+  String keyB = getKey(b.routeShortName);
+
+  int rankA = getRank(keyA);
+  int rankB = getRank(keyB);
+
+  if (rankA != rankB) {
+    return rankA.compareTo(rankB);
+  }
+
+  if (rankA == 1) {
+    int getNumber(String s) {
+      final match = RegExp(r'^\d+').firstMatch(s);
+      return match != null ? int.parse(match.group(0)!) : 0;
+    }
+    int diff = getNumber(keyA).compareTo(getNumber(keyB));
+    return diff == 0 ? keyA.compareTo(keyB) : diff;
+  } else {
+    return keyA.compareTo(keyB);
+  }
+});
+
       final menuItems = uiService.buildRouteDropdownItems(
         context,
         cleanRoutesList,
@@ -197,10 +237,15 @@ class _MapViewState extends State<MapView> {
           stopTimes.map((st) => dataservice.fetchStopById(st.stopId)),
         );
       }
+
+      var selectedVehicle = _selectedVehicles.firstWhere((v) {
+        return v.id == _selectedVehicleId;
+      });
+
       if (mounted) {
         setState(() {
           _stopTimes = stopTimes;
-         List<Shape> optimizedShapes = shapes;
+          List<Shape> optimizedShapes = shapes;
           if (shapes.length > 500) {
             optimizedShapes = [];
             for (int i = 0; i < shapes.length; i++) {
@@ -213,7 +258,9 @@ class _MapViewState extends State<MapView> {
           _shapes = optimizedShapes;
           _stops = stops;
           _activePolylines = uiService.buildTripPolyline(shapes, colorFromHex);
+
           _stopMarkers = uiService.buildStopMarkers(
+            selectedVehicle,
             _stopTimes,
             stops,
             colorFromHex,
@@ -299,6 +346,9 @@ class _MapViewState extends State<MapView> {
           onCompassPressed: () => debugPrint("Compass tapped"),
           onWarningPressed: () => debugPrint("Warning tapped"),
           onInfoPressed: () => debugPrint("Info tapped"),
+          vehicle: vehicle,
+          stopTimes: _stopTimes,
+          stops: _stops,
           child: markerContent,
         );
       } else {
@@ -381,7 +431,7 @@ class _MapViewState extends State<MapView> {
         point: LatLng(position.latitude, position.longitude),
         width: 35.0,
         height: 35.0,
-        child: const Icon(Icons.man_4_rounded, color: Colors.black, size: 35.0),
+        child: const Icon(Icons.person_pin_circle_sharp, color: Colors.blue, size: 35.0),
       );
       _mapController.move(LatLng(position.latitude, position.longitude), 15.0);
     });
@@ -452,8 +502,8 @@ class _MapViewState extends State<MapView> {
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 5),
               child: const Icon(
-                Icons.my_location,
-                color: Colors.black,
+                Icons.person_pin_circle_sharp,
+                color: Colors.blue,
                 size: 28.0,
               ),
             ),
@@ -537,7 +587,9 @@ class _MapViewState extends State<MapView> {
                               vertical: 4.0,
                             ),
                             child: DropdownButton<String>(
+                              borderRadius: BorderRadius.circular(20),
                               isExpanded: true,
+                              itemHeight: null,
                               hint: const Text("Select Route"),
                               value:
                                   _routeMenuItems.any(

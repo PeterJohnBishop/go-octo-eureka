@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_octo_eureka/maps/dataService.dart';
 import 'package:flutter_octo_eureka/maps/gtfsTypes.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -38,6 +39,7 @@ class UserInterfaceService {
       return DropdownMenuItem<String>(
         value: route.routeId,
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
               width: 14,
@@ -50,7 +52,17 @@ class UserInterfaceService {
 
             const SizedBox(width: 8),
 
-            // Alert Icon (Only shows if active alerts exist)
+            Expanded(
+              child: Text(
+                "${route.routeShortName}: ${route.routeLongName}",
+                style: const TextStyle(fontSize: 14),
+                softWrap: true, // Allow wrapping
+                maxLines: 2,
+              ),
+            ),
+
+            const SizedBox(width: 8),
+
             if (hasAlerts)
               GestureDetector(
                 onTap: () {
@@ -71,14 +83,6 @@ class UserInterfaceService {
                   ),
                 ),
               ),
-
-            Expanded(
-              child: Text(
-                "${route.routeShortName}: ${route.routeLongName}",
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 14),
-              ),
-            ),
           ],
         ),
       );
@@ -177,6 +181,7 @@ class UserInterfaceService {
   }
 
   List<Marker> buildStopMarkers(
+    VehiclePositionEntity vehicle,
     List<StopTime> stopTimes,
     List<Stop> stops,
     Color colorFromHex,
@@ -210,10 +215,14 @@ class UserInterfaceService {
           height: 175.0,
           alignment: Alignment.center,
           child: StopMarkerPopup(
+            stopId: stop.stopId,
             stopName: stop.stopName,
             arrivalTime: convertedArrival,
             departureTime: convertedDeparture,
             color: colorFromHex,
+            vehicle: vehicle!,
+            stopTimes: stopTimes,
+            stops: stops,
           ),
         ),
       );
@@ -331,14 +340,14 @@ class VehiclePinIcon extends StatelessWidget {
             Container(
               width: whiteCircleSize,
               height: whiteCircleSize,
-              decoration: const BoxDecoration(
-                color: Colors.white,
+              decoration: BoxDecoration(
+                color: iconColor,
                 shape: BoxShape.circle,
               ),
               alignment: Alignment.center,
               child: Icon(
                 vehicleIconData,
-                color: iconColor,
+                color: Colors.white,
                 size: innerIconSize,
               ),
             ),
@@ -359,6 +368,9 @@ class VehicleMarkerMenu extends StatefulWidget {
   final VoidCallback onCompassPressed;
   final VoidCallback onWarningPressed;
   final VoidCallback onInfoPressed;
+  final VehiclePositionEntity vehicle;
+  final List<StopTime> stopTimes;
+  final List<Stop> stops;
 
   const VehicleMarkerMenu({
     super.key,
@@ -371,6 +383,9 @@ class VehicleMarkerMenu extends StatefulWidget {
     required this.onCompassPressed,
     required this.onWarningPressed,
     required this.onInfoPressed,
+    required this.vehicle,
+    required this.stopTimes,
+    required this.stops,
   });
 
   @override
@@ -378,6 +393,7 @@ class VehicleMarkerMenu extends StatefulWidget {
 }
 
 class _VehicleMarkerMenuState extends State<VehicleMarkerMenu> {
+  Dataservice dataservice = Dataservice();
   bool _showDetail = false;
 
   @override
@@ -391,6 +407,22 @@ class _VehicleMarkerMenuState extends State<VehicleMarkerMenu> {
     } else {
       statusString = "In transit to";
     }
+    final speed = dataservice.calculateScheduledSpeedMPH(
+      widget.vehicle,
+      widget.stopTimes,
+      widget.stops,
+    );
+    final (delay, statusCode) = dataservice.calculateDelayStatus(
+      widget.vehicle,
+      widget.stopTimes,
+      widget.stops,
+    );
+    Color statusColor = switch (statusCode) {
+      1 => Colors.black, // On Time
+      0 => Colors.green, // Early
+      2 => Colors.red, // Late
+      _ => Colors.orange, // Default / Unknown (-1)
+    };
 
     return SizedBox(
       width: double.infinity,
@@ -444,6 +476,16 @@ class _VehicleMarkerMenuState extends State<VehicleMarkerMenu> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            Text(
+                              "Updated at ${widget.timestamp}",
+                              style: const TextStyle(
+                                color: Colors.black,
+                                fontSize: 10,
+                              ),
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                             widget.headsign != null &&
                                     widget.headsign!.isNotEmpty
                                 ? Container(
@@ -476,26 +518,57 @@ class _VehicleMarkerMenuState extends State<VehicleMarkerMenu> {
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
+                            widget.stop != null
+                                ? Text(
+                                    "${widget.stop?.stopName}.",
+                                    style: const TextStyle(
+                                      color: Colors.black,
+                                      fontSize: 12,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  )
+                                : Text(
+                                    "the next stop.",
+                                    style: const TextStyle(
+                                      color: Colors.black,
+                                      fontSize: 12,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                            const Divider(
+                              color: Colors.grey,
+                              thickness: 1.0,
+                              height: 20,
+                              indent: 10,
+                              endIndent: 10,
+                            ),
                             Text(
-                              widget.stop?.stopName ?? "loading stop...",
-                              style: const TextStyle(
-                                color: Colors.black,
+                              delay,
+                              style: TextStyle(
+                                color: statusColor,
                                 fontSize: 12,
                               ),
                               textAlign: TextAlign.center,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            Text(
-                              "Status updated at ${widget.timestamp}",
-                              style: const TextStyle(
-                                color: Colors.black,
-                                fontSize: 10,
-                              ),
-                              textAlign: TextAlign.center,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+
+                            widget.status == 1
+                                ? const SizedBox()
+                                : Text(
+                                    "Traveling ${speed.toStringAsFixed(2)} mph (Estimated).",
+                                    style: const TextStyle(
+                                      color: Colors.black,
+                                      fontSize: 10,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                           ],
                         ),
                       ),
@@ -511,17 +584,25 @@ class _VehicleMarkerMenuState extends State<VehicleMarkerMenu> {
 }
 
 class StopMarkerPopup extends StatefulWidget {
+  final String stopId;
   final String stopName;
   final String arrivalTime;
   final String departureTime;
   final Color color;
+  final VehiclePositionEntity vehicle;
+  final List<StopTime> stopTimes;
+  final List<Stop> stops;
 
   const StopMarkerPopup({
     super.key,
+    required this.stopId,
     required this.stopName,
     required this.arrivalTime,
     required this.departureTime,
     required this.color,
+    required this.vehicle,
+    required this.stopTimes,
+    required this.stops,
   });
 
   @override
@@ -529,17 +610,37 @@ class StopMarkerPopup extends StatefulWidget {
 }
 
 class _StopMarkerPopupState extends State<StopMarkerPopup> {
+  Dataservice dataservice = Dataservice();
   bool _showDetail = false;
 
   @override
   Widget build(BuildContext context) {
+    final (delay, statusCode) = dataservice.calculateStopDelayStatus(
+      widget.vehicle,
+      widget.stopTimes,
+      widget.stops,
+      widget.stopId,
+    );
+
+    Color statusColor = switch (statusCode) {
+      1 => Colors.black, // On Time
+      0 => Colors.green, // Early
+      2 => Colors.red, // Late
+      _ => Colors.orange, // Default / Unknown (-1)
+    };
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final double bottomSpacer = (constraints.maxHeight / 2) - 7.0;
 
-        return Container(
-          width: double.infinity,
-          height: double.infinity,
+        return OverflowBox(
+          // 1. Allow the column to grow as tall as it needs
+          minHeight: 0,
+          maxHeight: double.infinity,
+          // 2. Allow it to be as wide as needed (prevents horizontal clipping)
+          maxWidth: double.infinity,
+          // 3. Anchor everything to the bottom so the spacer pushes the marker
+          //    to the correct vertical center relative to the map coordinate.
           alignment: Alignment.bottomCenter,
           child: Column(
             mainAxisAlignment: MainAxisAlignment.end,
@@ -564,7 +665,9 @@ class _StopMarkerPopupState extends State<StopMarkerPopup> {
                       borderRadius: BorderRadius.circular(6),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.3),
+                          color: Colors.black.withOpacity(
+                            0.3,
+                          ), // Safe standard opacity
                           blurRadius: 2,
                           offset: const Offset(0, 1),
                         ),
@@ -585,26 +688,26 @@ class _StopMarkerPopupState extends State<StopMarkerPopup> {
                         ),
                         const Text(
                           "Scheduled",
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: TextStyle(color: Colors.black, fontSize: 10),
                         ),
                         Text(
-                          "arrival: ${widget.arrivalTime},",
+                          "Arr: ${widget.arrivalTime}",
                           style: const TextStyle(
                             color: Colors.black,
                             fontSize: 10,
                           ),
-                          textAlign: TextAlign.center,
                         ),
                         Text(
-                          "departure: ${widget.departureTime}",
+                          "Dep: ${widget.departureTime}",
                           style: const TextStyle(
                             color: Colors.black,
                             fontSize: 10,
                           ),
+                        ),
+                        const SizedBox(height: 2), // Small gap
+                        Text(
+                          "Est: ${delay}",
+                          style: TextStyle(color: statusColor, fontSize: 10),
                           textAlign: TextAlign.center,
                         ),
                       ],
@@ -619,12 +722,12 @@ class _StopMarkerPopupState extends State<StopMarkerPopup> {
                   });
                 },
                 child: Container(
-                  width: 14,
-                  height: 14,
+                  width: 20,
+                  height: 20,
                   decoration: BoxDecoration(
                     color: Colors.white,
                     shape: BoxShape.circle,
-                    border: Border.all(color: widget.color, width: 3),
+                    border: Border.all(color: widget.color, width: 4),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.2),

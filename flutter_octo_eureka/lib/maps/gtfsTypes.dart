@@ -240,6 +240,21 @@ class StopTime {
       'timepoint': timepoint,
     };
   }
+
+  factory StopTime.empty() {
+    return StopTime(
+      tripId: "",
+      arrivalTime: "",
+      departureTime: "",
+      stopId: "",
+      stopSequence: 0,
+      stopHeadsign: "",
+      pickupType: 0,
+      dropOffType: 0,
+      shapeDistTraveled: 0.0,
+      timepoint: 0,
+    );
+  }
 }
 
 class Stop {
@@ -303,6 +318,23 @@ class Stop {
       'stop_timezone': stopTimezone,
       'wheelchair_boarding': wheelchairBoarding,
     };
+  }
+
+  factory Stop.empty() {
+    return Stop(
+      stopId: "",
+      stopCode: "",
+      stopName: "Unknown Stop",
+      stopDesc: "",
+      stopLat: 0.0,
+      stopLon: 0.0,
+      zoneId: "",
+      stopUrl: "",
+      locationType: 0,
+      parentStation: "",
+      stopTimezone: "",
+      wheelchairBoarding: 0,
+    );
   }
 }
 

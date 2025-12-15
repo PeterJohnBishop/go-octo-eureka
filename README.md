@@ -1,6 +1,6 @@
 # flutter_octo_eureka
 
-To get started, select a route from the dropdown menu to see the real time location of buses or trains that run that route. Their direction of travel is indicated by the red arrow on the marker. 
+To get started, select a route from the dropdown menu to see the real time location of buses or trains that run that route. Their direction of travel is indicated by the red arrow on the vehicle marker. 
 
 ![SelectARoute](https://github.com/PeterJohnBishop/go-octo-eureka/blob/main/README%20Assets/SelectARoute.gif?raw=true)
 
@@ -9,23 +9,33 @@ If there are any service alerts for that route a yellow caution icon will be sho
 ![ViewAlerts](https://github.com/PeterJohnBishop/go-octo-eureka/blob/main/README%20Assets/ViewAlerts.gif?raw=true)
 
 To see the route traveled by a bus or train, tap it once to see the route on the map with indicators for each stop.
-Tap any stop to see stop details including the scheduled arrival and departure time. Tap the details to dismiss them.
-Tap on the vehicle to see it's headsign, current status, and the time it was last updated.
 
-![ViewTripDetails](https://github.com/PeterJohnBishop/go-octo-eureka/blob/main/README%20Assets/ViewTripDetails.gif?raw=true)
+Tap any stop to see stop details including the scheduled arrival and departure time, and if a train or bus will be early or late to a stop. 
+
+Tap on the selected vehicle to see it's headsign, current status, if it appears to be running late or early, and the time it was last updated. Estimated average speed of the train or bus traveling to the next stop is also shown.
+
+![ViewTripDetails](https://github.com/PeterJohnBishop/go-octo-eureka/blob/main/README%20Assets/ViewTripDetails2.gif?raw=true)
 
 # go-octo-eureka
 
-A server providing a REST API to consume GTFS data from RTD, direction and geolocation services from GoogleMaps, and email notifications via Resend.
+A containerized Go/Gin server
+- parse CSV data files to generate plug-and-play data sets formatted for Go
+- API to serve GTFS static data and retrieve GTFS realtime data feeds
+- API to serve Google Maps API services (under construction)
+- API to serve Resend API email notification services (under construction)
+- websocket communication 
 
-# container update
+- Container deployed on Heroku container registery
+- On Docker Hub at peterjbishop/goocto-eureka:latest
+
+# container update notes
 docker build --platform linux/amd64 --provenance=false -t registry.heroku.com/go-octo-eureka/web .
 docker push registry.heroku.com/go-octo-eureka/web
 heroku container:release web -a go-octo-eureka
 
 https://go-octo-eureka-b5f27b3f9a5c.herokuapp.com/
 
-# docker
+# docker notes
 docker build -t peterjbishop/goocto-eureka:latest .
 docker push peterjbishop/goocto-eureka:latest
 

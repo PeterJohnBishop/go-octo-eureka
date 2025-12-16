@@ -34,5 +34,6 @@ go.work.sum
 server/processing/routes.go
 server/processing/shapes.go
 server/processing/stop_times.go
+server/processing/trip_stop_times.go
 server/processing/stops.go
 server/processing/trips.go

@@ -279,8 +279,8 @@ func GenerateStopTimesData() bool {
 
 	fmt.Println("Sorting StopTimes...")
 	sort.Slice(data, func(i, j int) bool {
-		if data[i].TripID != data[j].TripID {
-			return data[i].TripID < data[j].TripID
+		if data[i].StopID != data[j].StopID {
+			return data[i].StopID < data[j].StopID
 		}
 		return data[i].StopSequence < data[j].StopSequence
 	})
@@ -303,6 +303,74 @@ func GenerateStopTimesData() bool {
 	}
 	fmt.Fprintln(writer, "}")
 	fmt.Println("Sorted StopTimes saved to", outPath)
+	return true
+}
+
+func GenerateTripStopTimesData() bool {
+	outPath := outputUrl + "trip_stop_times.go"
+	if _, err := os.Stat(outPath); err == nil {
+		fmt.Println("StopTime File already exists, skipping generation.")
+		return true
+	}
+
+	reader, inFile, err := OpenCSVReader("stop_times.txt")
+	if err != nil {
+		fmt.Println(err)
+		return false
+	}
+	defer inFile.Close()
+
+	var data []StopTime
+	for {
+		row, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			continue
+		}
+
+		seq, _ := strconv.Atoi(row[4])
+		pickup, _ := strconv.Atoi(row[6])
+		drop, _ := strconv.Atoi(row[7])
+
+		data = append(data, StopTime{
+			TripID:        row[0],
+			ArrivalTime:   row[1],
+			DepartureTime: row[2],
+			StopID:        row[3],
+			StopSequence:  seq,
+			PickupType:    pickup,
+			DropOffType:   drop,
+		})
+	}
+
+	fmt.Println("Sorting StopTimes...")
+	sort.Slice(data, func(i, j int) bool {
+		if data[i].TripID != data[j].TripID {
+			return data[i].TripID < data[j].TripID
+		}
+		return data[i].StopSequence < data[j].StopSequence
+	})
+
+	outFile, err := os.Create(outPath)
+	if err != nil {
+		fmt.Println("Error creating Go file:", err)
+		return false
+	}
+	defer outFile.Close()
+
+	writer := bufio.NewWriter(outFile)
+	defer writer.Flush()
+
+	fmt.Fprintln(writer, "package processing")
+	fmt.Fprintln(writer, "var StopTimes = []TripStopTime{")
+	for _, st := range data {
+		fmt.Fprintf(writer, "\t{TripID: %q, ArrivalTime: %q, DepartureTime: %q, StopID: %q, StopSequence: %d, PickupType: %d, DropOffType: %d},\n",
+			st.TripID, st.ArrivalTime, st.DepartureTime, st.StopID, st.StopSequence, st.PickupType, st.DropOffType)
+	}
+	fmt.Fprintln(writer, "}")
+	fmt.Println("Sorted Trip StopTimes saved to", outPath)
 	return true
 }
 

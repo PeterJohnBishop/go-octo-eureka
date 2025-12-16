@@ -8,6 +8,7 @@ import (
 	"go-octo-eureka/server/wsservice"
 	"log"
 	"os"
+	"sync"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -23,7 +24,7 @@ func ServeGin() {
 	// uncomment if data files have been updated to regenerate data sets
 
 	// var wg sync.WaitGroup
-	// wg.Add(5)
+	// wg.Add(6)
 
 	// go func() {
 	// 	fmt.Println("Starting GenerateTripData...")
@@ -54,6 +55,14 @@ func ServeGin() {
 	// 	haveData := processing.GenerateStopTimesData()
 	// 	if haveData {
 	// 		fmt.Println("Finished GenerateStopTimesData")
+	// 	}
+	// 	wg.Done()
+	// }()
+	// go func() {
+	// 	fmt.Println("Starting GenerateTripStopTimesData...")
+	// 	haveData := processing.GenerateTripStopTimesData()
+	// 	if haveData {
+	// 		fmt.Println("Finished GenerateTripStopTimesData")
 	// 	}
 	// 	wg.Done()
 	// }()

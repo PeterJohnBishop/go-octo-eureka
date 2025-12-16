@@ -416,6 +416,7 @@ func _FindTripsForEachStopTime(stopTimes []StopTime, allTrips []Trip) []Trip {
 	}
 	return results
 }
+
 type RouteShape struct {
 	ShapeID string
 	TripID  string
@@ -423,17 +424,10 @@ type RouteShape struct {
 }
 
 func _FindRouteTripShape(foundTrips []Trip, allRoutes []Route) []RouteShape {
-
 	results := make([]RouteShape, 0, len(foundTrips))
-
-	seenShapes := make(map[string]bool)
 
 	for i := range foundTrips {
 		t := &foundTrips[i]
-
-		if seenShapes[t.ShapeID] {
-			continue
-		}
 
 		idx := sort.Search(len(allRoutes), func(j int) bool {
 			return allRoutes[j].RouteID >= t.RouteID
@@ -442,7 +436,6 @@ func _FindRouteTripShape(foundTrips []Trip, allRoutes []Route) []RouteShape {
 		if idx < len(allRoutes) {
 			r := &allRoutes[idx]
 			if r.RouteID == t.RouteID {
-				seenShapes[t.ShapeID] = true
 
 				results = append(results, RouteShape{
 					ShapeID: t.ShapeID,

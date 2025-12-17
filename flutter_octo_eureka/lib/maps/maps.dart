@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_octo_eureka/maps/ApiService.dart';
 import 'package:flutter_octo_eureka/maps/dataService.dart';
 import 'package:flutter_octo_eureka/maps/gtfsTypes.dart';
 import 'package:flutter_octo_eureka/maps/userInterfaceService.dart';
@@ -17,7 +18,8 @@ class MapView extends StatefulWidget {
 }
 
 class _MapViewState extends State<MapView> {
-  final Dataservice dataservice = Dataservice();
+  final ApiService api = ApiService();
+  final DataService dataService = DataService();
   final UserInterfaceService uiService = UserInterfaceService();
   List<VehiclePositionEntity> _vehiclePositions = [];
   List<VehiclePositionEntity> _selectedVehicles = []; // via dropdown
@@ -47,7 +49,8 @@ class _MapViewState extends State<MapView> {
   void initState() {
     super.initState();
     _determinePosition();
-    _fetchVehiclePositionsData();
+    Future.delayed(Duration.zero);
+    _handleVehiclePositionLoading();
     _startAutoRefresh();
   }
 
@@ -58,149 +61,55 @@ class _MapViewState extends State<MapView> {
   }
 
   void _startAutoRefresh() {
-    _updateTimer = Timer.periodic(const Duration(minutes: 2), (timer) {
+    _updateTimer = Timer.periodic(const Duration(minutes: 2), (timer) async {
       debugPrint("Auto-refreshing GTFS data...");
-      _fetchVehiclePositionsData();
-      _fetchAlerts();
+      await _handleAlertsLoading();
+      await Future.delayed(Duration.zero);
+      await _handleVehiclePositionLoading();
     });
   }
 
-  Future<void> _fetchAndBuildNearPolylines(double lat, double lon) async {
+  // silently load polylines for routes with stops within 1 mile of the user
+  Future<void>  _handlePolylineLoading(double lat, double lon, double radius) async {
     setState(() {
       _activePolylines = [];
     });
-    try {
-      final data = await dataservice.fetchRouteTripShapes(lat, lon, 1.0);
-      if (data.isEmpty) return;
-
-      final uniqueRouteIds = data.map((d) => d.routeId).toSet();
-      final uniqueShapeIds = data.map((d) => d.shapeId).toSet();
-
-      debugPrint("DEBUG: Shape IDs found: $uniqueShapeIds");
-
-      final results = await Future.wait([
-        Future.wait(uniqueRouteIds.map((id) => dataservice.fetchRouteById(id))),
-        Future.wait(uniqueShapeIds.map((id) => dataservice.fetchShapeById(id))),
-      ]);
-
-      final routesList = results[0] as List<gtfsRoute>;
-      final shapesList = results[1] as List<List<Shape>>;
-
-      final routeMap = {for (var r in routesList) r.routeId: r};
-
-      final shapeMap = <String, List<Shape>>{};
-      for (var list in shapesList) {
-        if (list.isNotEmpty) {
-          shapeMap[list.first.shapeId] = list;
-        }
-      }
-
-      final List<Polyline> tempPolylines = [];
-
-      for (var d in data) {
-        final route = routeMap[d.routeId];
-        final List<Shape>? shapePoints = shapeMap[d.shapeId];
-
-        if (route != null && shapePoints != null && shapePoints.isNotEmpty) {
-          final color = uiService.colorFromHex(route.routeColor);
-
-          tempPolylines.addAll(
-            uiService.buildTripPolyline(route.routeId, shapePoints, color),
-          );
-        }
-      }
-
-      if (mounted) {
-        setState(() {
-          _activePolylines = tempPolylines;
-        });
-      }
-    } catch (e) {
-      debugPrint("Error processing polylines: $e");
-    }
+    final List<Polyline> tempPolylines =
+        await dataService.fetchAndBuildNearPolylines(lat, lon, radius);
+    setState(() {
+      _activePolylines = tempPolylines;
+    });
   }
 
-  // fetch real time vehicle data
-  // provides route_id to populate the inital route menu
-  // provides trip_id to populate stop, stop time, and shape data
-  Future<void> _fetchVehiclePositionsData() async {
+    // load alerts
+  Future<void>  _handleAlertsLoading() async {
     setState(() => _isLoading = true);
-    try {
-      final positions = await dataservice.fetchVehiclePositions();
-      if (positions.isEmpty) {
-        if (mounted) setState(() => _isLoading = false);
-        return;
-      }
-
-      await _fetchAlerts();
-      await Future.delayed(Duration.zero);
-
-      final List<gtfsRoute> rawRoutes = await dataservice.loadVehicleRoutes(
-        positions,
-      );
-
-      final uniqueRoutes = <String, gtfsRoute>{};
-      for (var route in rawRoutes) {
-        if (!uniqueRoutes.containsKey(route.routeId)) {
-          uniqueRoutes[route.routeId] = route;
-        }
-      }
-      final cleanRoutesList = uniqueRoutes.values.toList();
-
-      cleanRoutesList.sort((a, b) {
-        String getKey(String fullString) {
-          if (fullString.isEmpty) return "";
-          final index = fullString.indexOf(':');
-          if (index == -1) return fullString.trim();
-          return fullString.substring(0, index).trim();
-        }
-
-        bool isNumeric(String s) => RegExp(r'^\d').hasMatch(s);
-        bool isSingleLetter(String s) => s.length == 1 && !isNumeric(s);
-
-        int getRank(String key) {
-          if (isSingleLetter(key)) return 2;
-          if (isNumeric(key)) return 1;
-          return 0;
-        }
-
-        String keyA = getKey(a.routeShortName);
-        String keyB = getKey(b.routeShortName);
-
-        int rankA = getRank(keyA);
-        int rankB = getRank(keyB);
-
-        if (rankA != rankB) {
-          return rankA.compareTo(rankB);
-        }
-
-        if (rankA == 1) {
-          int getNumber(String s) {
-            final match = RegExp(r'^\d+').firstMatch(s);
-            return match != null ? int.parse(match.group(0)!) : 0;
-          }
-
-          int diff = getNumber(keyA).compareTo(getNumber(keyB));
-          return diff == 0 ? keyA.compareTo(keyB) : diff;
-        } else {
-          return keyA.compareTo(keyB);
-        }
+    _activeAlerts.clear();
+    List<AlertEntity> alerts = [];
+    List<AlertEntity> activeAlerts = [];
+    (alerts, activeAlerts) = await dataService.fetchAlerts(_selectedRouteId ?? "");
+    setState(() {
+        _alerts = alerts;
+        _activeAlerts = activeAlerts;
+        _isLoading = false;
       });
+  }
 
-      final menuItems = uiService.buildRouteDropdownItems(
-        context,
-        cleanRoutesList,
-        _alerts,
-      );
-
-      if (mounted) {
+  // load vehicle positions
+  Future<void>  _handleVehiclePositionLoading() async {
+        setState(() => _isLoading = true);
+        List<VehiclePositionEntity> positions = [];
+        List<AlertEntity> alerts = [];
+        List<gtfsRoute> routes = [];
+        List<DropdownMenuItem<String>> menuItems = [];
+        Map<String, gtfsRoute> uniqueRoutes = {};
+        (positions, alerts, routes, menuItems, uniqueRoutes) = await dataService.fetchVehiclePositionsData(context, _alerts);
         setState(() {
           _vehiclePositions = positions;
-          _routes = cleanRoutesList;
+          _routes = routes;
           _routeMenuItems = menuItems;
 
-          if (_selectedRouteId != null &&
-              !uniqueRoutes.containsKey(_selectedRouteId)) {
+          if (_selectedRouteId != null && !uniqueRoutes.containsKey(_selectedRouteId)) {
             _selectedRouteId = null;
             _selectedVehicles = [];
             _vehicleMarkers = [];
@@ -209,73 +118,35 @@ class _MapViewState extends State<MapView> {
 
           _isLoading = false;
         });
-      }
-    } catch (e) {
-      debugPrint("Error initializing GTFS data: $e");
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  // fetch alerts for selected route
-  Future<void> _fetchAlerts() async {
-    _activeAlerts.clear();
-    List<AlertEntity> selectedAlerts = [];
-    try {
-      final alerts = await dataservice.fetchAlerts();
-      if (alerts.isEmpty) return;
-      for (var alert in alerts) {
-        for (var r in alert.alert.informedEntity) {
-          if (r.routeId == _selectedRouteId) {
-            selectedAlerts.add(alert);
-          }
-        }
-      }
-      setState(() {
-        _alerts = alerts;
-        _activeAlerts = selectedAlerts;
-      });
-    } catch (e) {
-      debugPrint("Error loading alerts: $e");
-    }
   }
 
   // load trips for selected route to draw vehicles
   Future<void> _loadTrips(List<VehiclePositionEntity> vehicles) async {
     setState(() => _isLoading = true);
-
     final selectedVehicles = vehicles.where((entity) {
       return entity.vehicle.trip.routeId == _selectedRouteId;
     }).toList();
-
     if (selectedVehicles.isEmpty) {
       setState(() => _isLoading = false);
       return;
     }
-
     try {
       final results = await Future.wait(
-        selectedVehicles.map(
-          (v) => dataservice.fetchTripById(v.vehicle.trip.tripId),
-        ),
+        selectedVehicles.map((v) => api.fetchTripById(v.vehicle.trip.tripId)),
       );
-
       if (results.isEmpty) {
         setState(() => _isLoading = false);
         return;
       }
-
       final trips = results.whereType<Trip>().toList();
-
       if (mounted) {
         setState(() {
           _selectedVehicles = selectedVehicles;
           _trips = trips;
         });
-
         if (_selectedRouteId != null) {
           await _loadRouteTripDetails(_trips, _selectedRouteId!);
         }
-
         _showVehicles();
       }
     } catch (e) {
@@ -291,11 +162,9 @@ class _MapViewState extends State<MapView> {
     try {
       final trip = _trips.firstWhere((t) => t.tripId == tripId);
 
-      final List<Shape> shapes = await dataservice.fetchShapeById(trip.shapeId);
+      final List<Shape> shapes = await api.fetchShapeById(trip.shapeId);
 
-      final List<StopTime> stopTimes = await dataservice.fetchStopTimesByTripId(
-        tripId,
-      );
+      final List<StopTime> stopTimes = await api.fetchStopTimesByTripId(tripId);
 
       _mappedStopPositions.clear();
       for (var shape in shapes) {
@@ -313,7 +182,7 @@ class _MapViewState extends State<MapView> {
           final batch = uniqueStopIds.sublist(i, end);
 
           final batchResults = await Future.wait(
-            batch.map((id) => dataservice.fetchStopById(id)),
+            batch.map((id) => api.fetchStopById(id)),
           );
           stops.addAll(batchResults);
         }
@@ -382,7 +251,7 @@ class _MapViewState extends State<MapView> {
 
         await Future.wait(
           batch.map((shapeId) async {
-            final fetchedShapes = await dataservice.fetchShapeById(shapeId);
+            final fetchedShapes = await api.fetchShapeById(shapeId);
 
             List<Shape> optimizedShapes = fetchedShapes;
             if (fetchedShapes.length > 500) {
@@ -405,7 +274,7 @@ class _MapViewState extends State<MapView> {
         final batch = trips.sublist(i, end);
 
         final batchResults = await Future.wait(
-          batch.map((t) => dataservice.fetchStopTimesByTripId(t.tripId)),
+          batch.map((t) => api.fetchStopTimesByTripId(t.tripId)),
         );
 
         allStopTimes.addAll(batchResults.expand((x) => x));
@@ -425,7 +294,7 @@ class _MapViewState extends State<MapView> {
         final batch = uniqueStopIds.sublist(i, end);
 
         final batchResults = await Future.wait(
-          batch.map((id) => dataservice.fetchStopById(id)),
+          batch.map((id) => api.fetchStopById(id)),
         );
         allStops.addAll(batchResults);
       }
@@ -593,7 +462,7 @@ class _MapViewState extends State<MapView> {
 
     var position = await Geolocator.getCurrentPosition();
     _updateUserMarker(position);
-    _fetchAndBuildNearPolylines(position.latitude, position.longitude);
+    _handlePolylineLoading(position.latitude, position.longitude, 1.0);
   }
 
   void _updateUserMarker(Position position) {
@@ -846,7 +715,8 @@ class _MapViewState extends State<MapView> {
                                 tooltip: 'Refresh Routes',
                                 onPressed: () {
                                   setState(() {
-                                    _fetchVehiclePositionsData();
+                                    _handleAlertsLoading();
+                                    _handleVehiclePositionLoading();
                                   });
                                 },
                               ),

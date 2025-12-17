@@ -2,7 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:flutter_octo_eureka/maps/dataService.dart';
+import 'package:flutter_octo_eureka/maps/ApiService.dart';
 import 'package:flutter_octo_eureka/maps/gtfsTypes.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -420,7 +420,7 @@ class VehicleMarkerMenu extends StatefulWidget {
 }
 
 class _VehicleMarkerMenuState extends State<VehicleMarkerMenu> {
-  Dataservice dataservice = Dataservice();
+  ApiService api = ApiService();
   bool _showDetail = false;
 
   @override
@@ -434,12 +434,12 @@ class _VehicleMarkerMenuState extends State<VehicleMarkerMenu> {
     } else {
       statusString = "In transit to";
     }
-    final speed = dataservice.calculateScheduledSpeedMPH(
+    final speed = api.calculateScheduledSpeedMPH(
       widget.vehicle,
       widget.stopTimes,
       widget.stops,
     );
-    final (delay, statusCode) = dataservice.calculateDelayStatus(
+    final (delay, statusCode) = api.calculateDelayStatus(
       widget.vehicle,
       widget.stopTimes,
       widget.stops,
@@ -637,12 +637,12 @@ class StopMarkerPopup extends StatefulWidget {
 }
 
 class _StopMarkerPopupState extends State<StopMarkerPopup> {
-  Dataservice dataservice = Dataservice();
+  ApiService api = ApiService();
   bool _showDetail = false;
 
   @override
   Widget build(BuildContext context) {
-    final (delay, statusCode) = dataservice.calculateStopDelayStatus(
+    final (delay, statusCode) = api.calculateStopDelayStatus(
       widget.vehicle,
       widget.stopTimes,
       widget.stops,

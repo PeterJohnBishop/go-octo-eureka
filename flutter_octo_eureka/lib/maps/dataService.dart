@@ -85,24 +85,19 @@ class DataService {
   Future<
     (
       List<VehiclePositionEntity>,
-      List<AlertEntity>,
       List<gtfsRoute>,
-      List<DropdownMenuItem<String>>,
       Map<String, gtfsRoute>,
     )
   >
   fetchVehiclePositionsData(
     BuildContext context,
-    List<AlertEntity> alerts,
   ) async {
     try {
       final positions = await api.fetchVehiclePositions();
       if (positions.isEmpty) {
         return (
           <VehiclePositionEntity>[],
-          <AlertEntity>[],
           <gtfsRoute>[],
-          <DropdownMenuItem<String>>[],
           <String, gtfsRoute>{},
         );
       }
@@ -157,22 +152,110 @@ class DataService {
         }
       });
 
-      final menuItems = ui.buildRouteDropdownItems(
-        context,
-        cleanRoutesList,
-        alerts,
-      );
-
-      return (positions, alerts, cleanRoutesList, menuItems, uniqueRoutes);
+      return (positions, cleanRoutesList, uniqueRoutes);
     } catch (e) {
       debugPrint("Error initializing GTFS data: $e");
       return (
         <VehiclePositionEntity>[],
-        <AlertEntity>[],
         <gtfsRoute>[],
-        <DropdownMenuItem<String>>[],
         <String, gtfsRoute>{},
       );
     }
   }
+
+  Future<(List<VehiclePositionEntity>, List<Trip>)> fetchSelectedVehicles(
+    List<VehiclePositionEntity> vehicles,
+    String selectedRouteId,
+  ) async {
+    final selectedVehicles = vehicles.where((entity) {
+      return entity.vehicle.trip.routeId == selectedRouteId;
+    }).toList();
+    if (selectedVehicles.isEmpty) {
+      return (<VehiclePositionEntity>[], <Trip>[]);
+    }
+    try {
+      final results = await Future.wait(
+        selectedVehicles.map((v) => api.fetchTripById(v.vehicle.trip.tripId)),
+      );
+      if (results.isEmpty) {
+        return (<VehiclePositionEntity>[], <Trip>[]);
+      }
+      final trips = results.whereType<Trip>().toList();
+
+      return (selectedVehicles, trips);
+    } catch (e) {
+      debugPrint("Error loading trips: $e");
+      return (<VehiclePositionEntity>[], <Trip>[]);
+    }
+  }
+
+  Future<(List<StopTime>, List<Stop>, Map<String, List<Shape>>)> fetchRouteTripDetails(List<gtfsRoute> routes, List<Trip> trips, String routeId, Color colorFromHex) async {
+
+    try {
+      final uniqueShapeIds = trips.map((t) => t.shapeId).toSet().toList();
+      final Map<String, List<Shape>> shapeMap = {};
+
+      for (var i = 0; i < uniqueShapeIds.length; i += 10) {
+        final end = (i + 10 < uniqueShapeIds.length)
+            ? i + 10
+            : uniqueShapeIds.length;
+        final batch = uniqueShapeIds.sublist(i, end);
+
+        await Future.wait(
+          batch.map((shapeId) async {
+            final fetchedShapes = await api.fetchShapeById(shapeId);
+
+            List<Shape> optimizedShapes = fetchedShapes;
+            if (fetchedShapes.length > 500) {
+              optimizedShapes = [];
+              for (int k = 0; k < fetchedShapes.length; k++) {
+                if (k == 0 || k == fetchedShapes.length - 1 || k % 3 == 0) {
+                  optimizedShapes.add(fetchedShapes[k]);
+                }
+              }
+            }
+            shapeMap[shapeId] = optimizedShapes;
+          }),
+        );
+      }
+
+      final List<StopTime> allStopTimes = [];
+
+      for (var i = 0; i < trips.length; i += 20) {
+        final end = (i + 20 < trips.length) ? i + 20 : trips.length;
+        final batch = trips.sublist(i, end);
+
+        final batchResults = await Future.wait(
+          batch.map((t) => api.fetchStopTimesByTripId(t.tripId)),
+        );
+
+        allStopTimes.addAll(batchResults.expand((x) => x));
+      }
+
+      final uniqueStopIds = allStopTimes
+          .map((st) => st.stopId)
+          .toSet()
+          .toList();
+      final List<Stop> allStops = [];
+
+      // Process stops in batches of 20
+      for (var i = 0; i < uniqueStopIds.length; i += 20) {
+        final end = (i + 20 < uniqueStopIds.length)
+            ? i + 20
+            : uniqueStopIds.length;
+        final batch = uniqueStopIds.sublist(i, end);
+
+        final batchResults = await Future.wait(
+          batch.map((id) => api.fetchStopById(id)),
+        );
+        allStops.addAll(batchResults);
+      }
+
+      return (allStopTimes, allStops, shapeMap);
+    } catch (e) {
+      debugPrint("Error loading trip details: $e");
+      return (<StopTime>[], <Stop>[], <String, List<Shape>>{});
+    }
+  }
 }
+

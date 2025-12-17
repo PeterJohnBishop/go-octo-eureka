@@ -76,6 +76,7 @@ class _MapViewState extends State<MapView> {
     });
     final List<Polyline> tempPolylines =
         await dataService.fetchAndBuildNearPolylines(lat, lon, radius);
+        // if (tempPolylines.isEmpty) handle error
     setState(() {
       _activePolylines = tempPolylines;
     });
@@ -88,22 +89,26 @@ class _MapViewState extends State<MapView> {
     List<AlertEntity> alerts = [];
     List<AlertEntity> activeAlerts = [];
     (alerts, activeAlerts) = await dataService.fetchAlerts(_selectedRouteId ?? "");
+    // if (alerts.isEmpty || activeAlerts.isEmpty) handle error!!!
+    if (mounted) {
     setState(() {
         _alerts = alerts;
         _activeAlerts = activeAlerts;
         _isLoading = false;
       });
+    }
   }
 
   // load vehicle positions
   Future<void>  _handleVehiclePositionLoading() async {
         setState(() => _isLoading = true);
         List<VehiclePositionEntity> positions = [];
-        List<AlertEntity> alerts = [];
         List<gtfsRoute> routes = [];
-        List<DropdownMenuItem<String>> menuItems = [];
         Map<String, gtfsRoute> uniqueRoutes = {};
-        (positions, alerts, routes, menuItems, uniqueRoutes) = await dataService.fetchVehiclePositionsData(context, _alerts);
+        (positions, routes, uniqueRoutes) = await dataService.fetchVehiclePositionsData(context);
+        // if (positions.isEmpty || routes.isEmpty || menuItems.isEmpty || uniqueRoutes.isEmpty) handle error!!!
+        if (mounted) {
+        List<DropdownMenuItem<String>> menuItems = uiService.buildRouteDropdownItems(context, routes, _alerts);
         setState(() {
           _vehiclePositions = positions;
           _routes = routes;
@@ -118,41 +123,25 @@ class _MapViewState extends State<MapView> {
 
           _isLoading = false;
         });
+        }
   }
 
-  // load trips for selected route to draw vehicles
-  Future<void> _loadTrips(List<VehiclePositionEntity> vehicles) async {
+  Future<void> _handleVehicleTripLoading(List<VehiclePositionEntity> vehicles, String selectedRouteId) async {
     setState(() => _isLoading = true);
-    final selectedVehicles = vehicles.where((entity) {
-      return entity.vehicle.trip.routeId == _selectedRouteId;
-    }).toList();
-    if (selectedVehicles.isEmpty) {
-      setState(() => _isLoading = false);
-      return;
-    }
-    try {
-      final results = await Future.wait(
-        selectedVehicles.map((v) => api.fetchTripById(v.vehicle.trip.tripId)),
-      );
-      if (results.isEmpty) {
-        setState(() => _isLoading = false);
-        return;
-      }
-      final trips = results.whereType<Trip>().toList();
-      if (mounted) {
-        setState(() {
+    List<VehiclePositionEntity> selectedVehicles = [];
+    List<Trip> trips = [];
+    (selectedVehicles, trips) = await dataService.fetchSelectedVehicles(vehicles, selectedRouteId);
+    // if (selectedVehicles.isEmpty || trips.isEmpty) handle error!!!
+    if (mounted) {
+      setState(() {
           _selectedVehicles = selectedVehicles;
           _trips = trips;
         });
-        if (_selectedRouteId != null) {
-          await _loadRouteTripDetails(_trips, _selectedRouteId!);
-        }
-        _showVehicles();
-      }
-    } catch (e) {
-      debugPrint("Error loading trips: $e");
-      if (mounted) setState(() => _isLoading = false);
     }
+    if (_selectedRouteId != null) {
+      await _handleRouteTripDetailLoading(trips, _selectedRouteId!);
+    }
+    _showVehicles();
   }
 
   // if vehicle tapped, load trip details
@@ -233,106 +222,143 @@ class _MapViewState extends State<MapView> {
     }
   }
 
-  Future<void> _loadRouteTripDetails(List<Trip> trips, String routeId) async {
+  Future<void> _handleRouteTripDetailLoading(List<Trip> trips, String routeId) async {
     setState(() => _isLoading = true);
-
-    try {
-      var route = _routes.firstWhere((r) => r.routeId == routeId);
+    var route = _routes.firstWhere((r) => r.routeId == routeId);
       final colorFromHex = uiService.colorFromHex(route.routeColor);
-
-      final uniqueShapeIds = trips.map((t) => t.shapeId).toSet().toList();
-      final Map<String, List<Shape>> shapeMap = {};
-
-      for (var i = 0; i < uniqueShapeIds.length; i += 10) {
-        final end = (i + 10 < uniqueShapeIds.length)
-            ? i + 10
-            : uniqueShapeIds.length;
-        final batch = uniqueShapeIds.sublist(i, end);
-
-        await Future.wait(
-          batch.map((shapeId) async {
-            final fetchedShapes = await api.fetchShapeById(shapeId);
-
-            List<Shape> optimizedShapes = fetchedShapes;
-            if (fetchedShapes.length > 500) {
-              optimizedShapes = [];
-              for (int k = 0; k < fetchedShapes.length; k++) {
-                if (k == 0 || k == fetchedShapes.length - 1 || k % 3 == 0) {
-                  optimizedShapes.add(fetchedShapes[k]);
-                }
-              }
-            }
-            shapeMap[shapeId] = optimizedShapes;
-          }),
-        );
-      }
-
-      final List<StopTime> allStopTimes = [];
-
-      for (var i = 0; i < trips.length; i += 20) {
-        final end = (i + 20 < trips.length) ? i + 20 : trips.length;
-        final batch = trips.sublist(i, end);
-
-        final batchResults = await Future.wait(
-          batch.map((t) => api.fetchStopTimesByTripId(t.tripId)),
-        );
-
-        allStopTimes.addAll(batchResults.expand((x) => x));
-      }
-
-      final uniqueStopIds = allStopTimes
-          .map((st) => st.stopId)
-          .toSet()
-          .toList();
-      final List<Stop> allStops = [];
-
-      // Process stops in batches of 20
-      for (var i = 0; i < uniqueStopIds.length; i += 20) {
-        final end = (i + 20 < uniqueStopIds.length)
-            ? i + 20
-            : uniqueStopIds.length;
-        final batch = uniqueStopIds.sublist(i, end);
-
-        final batchResults = await Future.wait(
-          batch.map((id) => api.fetchStopById(id)),
-        );
-        allStops.addAll(batchResults);
-      }
-
-      _mappedStopPositions.clear();
-      for (var shapeList in shapeMap.values) {
+    List<StopTime> allStopTimes = [];
+    List<Stop> allStops = [];
+    Map<String, List<Shape>> allShapes = {};
+    (allStopTimes, allStops, allShapes) = await dataService.fetchRouteTripDetails(_routes, trips, routeId, colorFromHex);
+    // if (allStopTimes.isEmpty || allStops.isEmpty || allShapes.isEmpty) handle error!!!
+     _mappedStopPositions.clear();
+      for (var shapeList in allShapes.values) {
         for (var s in shapeList) {
           _mappedStopPositions.add(LatLng(s.shapePtLat, s.shapePtLon));
         }
       }
+    if (mounted) {
+      setState(() {
+        _stopTimes = allStopTimes;
+        _stops = allStops;
+        _shapes = allShapes.values.expand((x) => x).toList();
 
-      if (mounted) {
-        setState(() {
-          _stopTimes = allStopTimes;
-          _stops = allStops;
-          _shapes = shapeMap.values.expand((x) => x).toList();
-
-          _activePolylines = [];
-          shapeMap.forEach((id, shapeList) {
-            _activePolylines.addAll(
+        _activePolylines = [];
+        allShapes.forEach((id, shapeList) {
+          _activePolylines.addAll(
               uiService.buildTripPolyline(null, shapeList, colorFromHex),
             );
           });
-
-          _stopMarkers = uiService.buildSimpleStopMarkers(_stops, colorFromHex);
-
-          // Optional: Zoom to fit
-          _zoomToFit(_mappedStopPositions);
+                  _stopMarkers = uiService.buildSimpleStopMarkers(_stops, colorFromHex);
+ _zoomToFit(_mappedStopPositions);
 
           _isLoading = false;
-        });
-        _showVehicles();
-      }
-    } catch (e) {
-      debugPrint("Error loading trip details: $e");
-      if (mounted) setState(() => _isLoading = false);
+    });
+    _showVehicles();
     }
   }
+
+
+  // Future<void> _loadRouteTripDetails(List<Trip> trips, String routeId) async {
+  //   setState(() => _isLoading = true);
+
+  //   try {
+  //     var route = _routes.firstWhere((r) => r.routeId == routeId);
+  //     final colorFromHex = uiService.colorFromHex(route.routeColor);
+
+  //     final uniqueShapeIds = trips.map((t) => t.shapeId).toSet().toList();
+  //     final Map<String, List<Shape>> shapeMap = {};
+
+  //     for (var i = 0; i < uniqueShapeIds.length; i += 10) {
+  //       final end = (i + 10 < uniqueShapeIds.length)
+  //           ? i + 10
+  //           : uniqueShapeIds.length;
+  //       final batch = uniqueShapeIds.sublist(i, end);
+
+  //       await Future.wait(
+  //         batch.map((shapeId) async {
+  //           final fetchedShapes = await api.fetchShapeById(shapeId);
+
+  //           List<Shape> optimizedShapes = fetchedShapes;
+  //           if (fetchedShapes.length > 500) {
+  //             optimizedShapes = [];
+  //             for (int k = 0; k < fetchedShapes.length; k++) {
+  //               if (k == 0 || k == fetchedShapes.length - 1 || k % 3 == 0) {
+  //                 optimizedShapes.add(fetchedShapes[k]);
+  //               }
+  //             }
+  //           }
+  //           shapeMap[shapeId] = optimizedShapes;
+  //         }),
+  //       );
+  //     }
+
+  //     final List<StopTime> allStopTimes = [];
+
+  //     for (var i = 0; i < trips.length; i += 20) {
+  //       final end = (i + 20 < trips.length) ? i + 20 : trips.length;
+  //       final batch = trips.sublist(i, end);
+
+  //       final batchResults = await Future.wait(
+  //         batch.map((t) => api.fetchStopTimesByTripId(t.tripId)),
+  //       );
+
+  //       allStopTimes.addAll(batchResults.expand((x) => x));
+  //     }
+
+  //     final uniqueStopIds = allStopTimes
+  //         .map((st) => st.stopId)
+  //         .toSet()
+  //         .toList();
+  //     final List<Stop> allStops = [];
+
+  //     // Process stops in batches of 20
+  //     for (var i = 0; i < uniqueStopIds.length; i += 20) {
+  //       final end = (i + 20 < uniqueStopIds.length)
+  //           ? i + 20
+  //           : uniqueStopIds.length;
+  //       final batch = uniqueStopIds.sublist(i, end);
+
+  //       final batchResults = await Future.wait(
+  //         batch.map((id) => api.fetchStopById(id)),
+  //       );
+  //       allStops.addAll(batchResults);
+  //     }
+
+  //     _mappedStopPositions.clear();
+  //     for (var shapeList in shapeMap.values) {
+  //       for (var s in shapeList) {
+  //         _mappedStopPositions.add(LatLng(s.shapePtLat, s.shapePtLon));
+  //       }
+  //     }
+
+  //     if (mounted) {
+  //       setState(() {
+  //         _stopTimes = allStopTimes;
+  //         _stops = allStops;
+  //         _shapes = shapeMap.values.expand((x) => x).toList();
+
+  //         _activePolylines = [];
+  //         shapeMap.forEach((id, shapeList) {
+  //           _activePolylines.addAll(
+  //             uiService.buildTripPolyline(null, shapeList, colorFromHex),
+  //           );
+  //         });
+
+  //         _stopMarkers = uiService.buildSimpleStopMarkers(_stops, colorFromHex);
+
+  //         // Optional: Zoom to fit
+  //         _zoomToFit(_mappedStopPositions);
+
+  //         _isLoading = false;
+  //       });
+  //       _showVehicles();
+  //     }
+  //   } catch (e) {
+  //     debugPrint("Error loading trip details: $e");
+  //     if (mounted) setState(() => _isLoading = false);
+  //   }
+  // }
 
   void _showVehicles() {
     _vehicleMarkers.clear();
@@ -616,7 +642,7 @@ class _MapViewState extends State<MapView> {
                               _stopMarkers = [];
                               _selectedRouteId = "$tappedData";
                             });
-                            _loadTrips(_vehiclePositions);
+                            _handleVehicleTripLoading(_vehiclePositions, "$tappedData");
                           }
                         }
                       },
@@ -692,7 +718,10 @@ class _MapViewState extends State<MapView> {
                                   // set selected route
                                   _selectedRouteId = value;
                                 });
-                                _loadTrips(_vehiclePositions);
+                                if (value == null) {
+                                  _handleVehicleTripLoading(_vehiclePositions, "");
+                                }
+                                _handleVehicleTripLoading(_vehiclePositions, value!);
                               },
                             ),
                           ),

@@ -130,6 +130,12 @@ class Dataservice {
     return StopTime.fromJson(data);
   }
 
+  Future<List<RouteTripShape>> fetchRouteTripShapes(double lat, double lon) async {
+    final data = await _get('/routes/lat/$lat/lon/$lon');
+    return (data as List).map((json) => RouteTripShape.fromJson(json)).toList();
+  }
+
+
   DateTime parseGtfsTime(String timeString) {
   if (timeString.isEmpty) return DateTime.now();
   

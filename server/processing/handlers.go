@@ -197,7 +197,7 @@ func HandleShapesById(c *gin.Context) {
 }
 
 // GET /stoptimes
-func HandleStopTimes(c *gin.Context) {
+func HandleStopTimesByStopId(c *gin.Context) {
 	c.JSON(http.StatusOK, StopTimes)
 }
 
@@ -283,6 +283,7 @@ func HandleTripsById(c *gin.Context) {
 func HandleNearRoutes(c *gin.Context) {
 	latStr := c.Param("lat")
 	lonStr := c.Param("lon")
+	radiusStr := c.Param("radius")
 
 	lat, err := strconv.ParseFloat(latStr, 64)
 	if err != nil {
@@ -296,8 +297,14 @@ func HandleNearRoutes(c *gin.Context) {
 		return
 	}
 
+	radius, err = strconv.ParseFloat(radiusStr, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid radius"})
+		return
+	}
+
 	// find near by stops
-	nearStops := _FindStopsWithinXMiles(lat, lon, 5.0, Stops)
+	nearStops := _FindStopsWithinXMiles(lat, lon, radius, Stops)
 	// find stopTimes for nearStops
 	stopTimes := _FindStopTimesForEachStop(nearStops, StopTimes)
 	// find trips for stopTimes
@@ -326,7 +333,7 @@ func HandleNearStops(c *gin.Context) {
 		return
 	}
 
-	nearStops := _FindStopsWithinXMiles(lat, lon, 5.0, Stops)
+	nearStops := _FindStopsWithinXMiles(lat, lon, 2.0, Stops)
 
 	c.JSON(http.StatusOK, nearStops)
 }
@@ -340,7 +347,7 @@ func _FindStopsWithinXMiles(userLat, userLon float64, miles float64, allStops []
 	minLat, maxLat := userLat-latDiff, userLat+latDiff
 	minLon, maxLon := userLon-lonDiff, userLon+lonDiff
 
-	nearbyStops := make([]Stop, 0, 20)
+	nearbyStops := make([]Stop, 0, 50)
 
 	userCoord := haversine.Coord{Lat: userLat, Lon: userLon}
 
@@ -424,10 +431,15 @@ type RouteShape struct {
 }
 
 func _FindRouteTripShape(foundTrips []Trip, allRoutes []Route) []RouteShape {
-	results := make([]RouteShape, 0, len(foundTrips))
+	results := make([]RouteShape, 0)
+	seenRoutes := make(map[string]struct{})
 
 	for i := range foundTrips {
 		t := &foundTrips[i]
+
+		if _, exists := seenRoutes[t.RouteID]; exists {
+			continue
+		}
 
 		idx := sort.Search(len(allRoutes), func(j int) bool {
 			return allRoutes[j].RouteID >= t.RouteID
@@ -436,12 +448,13 @@ func _FindRouteTripShape(foundTrips []Trip, allRoutes []Route) []RouteShape {
 		if idx < len(allRoutes) {
 			r := &allRoutes[idx]
 			if r.RouteID == t.RouteID {
-
 				results = append(results, RouteShape{
 					ShapeID: t.ShapeID,
 					TripID:  t.TripID,
 					RouteID: r.RouteID,
 				})
+
+				seenRoutes[t.RouteID] = struct{}{}
 			}
 		}
 	}

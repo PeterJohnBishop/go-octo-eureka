@@ -47,6 +47,7 @@ class _MapViewState extends State<MapView> {
   @override
   void initState() {
     super.initState();
+    _determinePosition();
     _fetchVehiclePositionsData();
     _startAutoRefresh();
   }
@@ -63,6 +64,56 @@ class _MapViewState extends State<MapView> {
       _fetchVehiclePositionsData();
       _fetchAlerts();
     });
+  }
+
+  Future<void> _fetchAndBuildNearPolylines(double lat, double lon) async {
+    try {
+      final data = await dataservice.fetchRouteTripShapes(lat, lon);
+      if (data.isEmpty) return;
+
+      final uniqueRouteIds = data.map((d) => d.routeId).toSet();
+      final uniqueShapeIds = data.map((d) => d.shapeId).toSet();
+
+      debugPrint("DEBUG: Shape IDs found: $uniqueShapeIds");
+
+      final results = await Future.wait([
+        Future.wait(uniqueRouteIds.map((id) => dataservice.fetchRouteById(id))),
+        Future.wait(uniqueShapeIds.map((id) => dataservice.fetchShapeById(id))),
+      ]);
+
+      final routesList = results[0] as List<gtfsRoute>;
+      final shapesList = results[1] as List<List<Shape>>;
+
+      final routeMap = {for (var r in routesList) r.routeId: r};
+
+      final shapeMap = <String, List<Shape>>{};
+      for (var list in shapesList) {
+        if (list.isNotEmpty) {
+          shapeMap[list.first.shapeId] = list;
+        }
+      }
+
+      final List<Polyline> tempPolylines = [];
+
+      for (var d in data) {
+        final route = routeMap[d.routeId];
+        final List<Shape>? shapePoints = shapeMap[d.shapeId];
+
+        if (route != null && shapePoints != null && shapePoints.isNotEmpty) {
+          final color = uiService.colorFromHex(route.routeColor);
+
+          tempPolylines.addAll(uiService.buildTripPolyline(shapePoints, color));
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _activePolylines = tempPolylines;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error processing polylines: $e");
+    }
   }
 
   // fetch real time vehicle data
@@ -92,45 +143,45 @@ class _MapViewState extends State<MapView> {
       }
       final cleanRoutesList = uniqueRoutes.values.toList();
 
-cleanRoutesList.sort((a, b) {
+      cleanRoutesList.sort((a, b) {
+        String getKey(String fullString) {
+          if (fullString.isEmpty) return "";
+          final index = fullString.indexOf(':');
+          if (index == -1) return fullString.trim();
+          return fullString.substring(0, index).trim();
+        }
 
-  String getKey(String fullString) {
-    if (fullString.isEmpty) return "";
-    final index = fullString.indexOf(':');
-    if (index == -1) return fullString.trim();
-    return fullString.substring(0, index).trim();
-  }
+        bool isNumeric(String s) => RegExp(r'^\d').hasMatch(s);
+        bool isSingleLetter(String s) => s.length == 1 && !isNumeric(s);
 
-  bool isNumeric(String s) => RegExp(r'^\d').hasMatch(s);
-  bool isSingleLetter(String s) => s.length == 1 && !isNumeric(s);
+        int getRank(String key) {
+          if (isSingleLetter(key)) return 2;
+          if (isNumeric(key)) return 1;
+          return 0;
+        }
 
-  int getRank(String key) {
-    if (isSingleLetter(key)) return 2; 
-    if (isNumeric(key)) return 1;      
-    return 0;                          
-  }
+        String keyA = getKey(a.routeShortName);
+        String keyB = getKey(b.routeShortName);
 
-  String keyA = getKey(a.routeShortName);
-  String keyB = getKey(b.routeShortName);
+        int rankA = getRank(keyA);
+        int rankB = getRank(keyB);
 
-  int rankA = getRank(keyA);
-  int rankB = getRank(keyB);
+        if (rankA != rankB) {
+          return rankA.compareTo(rankB);
+        }
 
-  if (rankA != rankB) {
-    return rankA.compareTo(rankB);
-  }
+        if (rankA == 1) {
+          int getNumber(String s) {
+            final match = RegExp(r'^\d+').firstMatch(s);
+            return match != null ? int.parse(match.group(0)!) : 0;
+          }
 
-  if (rankA == 1) {
-    int getNumber(String s) {
-      final match = RegExp(r'^\d+').firstMatch(s);
-      return match != null ? int.parse(match.group(0)!) : 0;
-    }
-    int diff = getNumber(keyA).compareTo(getNumber(keyB));
-    return diff == 0 ? keyA.compareTo(keyB) : diff;
-  } else {
-    return keyA.compareTo(keyB);
-  }
-});
+          int diff = getNumber(keyA).compareTo(getNumber(keyB));
+          return diff == 0 ? keyA.compareTo(keyB) : diff;
+        } else {
+          return keyA.compareTo(keyB);
+        }
+      });
 
       final menuItems = uiService.buildRouteDropdownItems(
         context,
@@ -423,6 +474,7 @@ cleanRoutesList.sort((a, b) {
 
     var position = await Geolocator.getCurrentPosition();
     _updateUserMarker(position);
+    _fetchAndBuildNearPolylines(position.latitude, position.longitude);
   }
 
   void _updateUserMarker(Position position) {
@@ -431,7 +483,11 @@ cleanRoutesList.sort((a, b) {
         point: LatLng(position.latitude, position.longitude),
         width: 35.0,
         height: 35.0,
-        child: const Icon(Icons.person_pin_circle_sharp, color: Colors.blue, size: 35.0),
+        child: const Icon(
+          Icons.person_pin_circle_sharp,
+          color: Colors.blue,
+          size: 35.0,
+        ),
       );
       _mapController.move(LatLng(position.latitude, position.longitude), 15.0);
     });

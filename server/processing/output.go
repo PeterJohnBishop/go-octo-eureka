@@ -364,7 +364,7 @@ func GenerateTripStopTimesData() bool {
 	defer writer.Flush()
 
 	fmt.Fprintln(writer, "package processing")
-	fmt.Fprintln(writer, "var StopTimes = []TripStopTime{")
+	fmt.Fprintln(writer, "var TripStopTimes = []StopTime{")
 	for _, st := range data {
 		fmt.Fprintf(writer, "\t{TripID: %q, ArrivalTime: %q, DepartureTime: %q, StopID: %q, StopSequence: %d, PickupType: %d, DropOffType: %d},\n",
 			st.TripID, st.ArrivalTime, st.DepartureTime, st.StopID, st.StopSequence, st.PickupType, st.DropOffType)

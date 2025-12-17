@@ -8,7 +8,6 @@ import (
 	"go-octo-eureka/server/wsservice"
 	"log"
 	"os"
-	"sync"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"

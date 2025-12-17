@@ -133,6 +133,34 @@ class Shape {
   }
 }
 
+class RouteTripShape {
+  final String routeId;
+  final String tripId;
+  final String shapeId;
+
+  RouteTripShape({
+    required this.routeId,
+    required this.tripId,
+    required this.shapeId,
+  });
+
+  factory RouteTripShape.fromJson(Map<String, dynamic> json) {
+    return RouteTripShape(
+      routeId: json['RouteID'] ?? '',
+      tripId: json['TripID'] ?? '',
+      shapeId: json['ShapeID'] ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'RouteID': routeId,
+      'TripID': tripId,
+      'ShapeID': shapeId,
+    };
+  }
+}
+
 class PolyShape {
   final String shapeId;
   final double shapePtLat;

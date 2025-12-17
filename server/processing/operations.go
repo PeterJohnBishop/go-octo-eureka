@@ -129,38 +129,37 @@ func findStopTimesByStopID(stopId string) ([]StopTime, bool) {
 }
 
 func findStopTimesByTripID(tripId string) ([]StopTime, bool) {
-data := TripStopTimes
-n := len(data)
+	data := TripStopTimes
+	n := len(data)
 
-idx := sort.Search(n, func(i int) bool {
-return data[i].TripID >= tripId
-})
+	idx := sort.Search(n, func(i int) bool {
+		return data[i].TripID >= tripId
+	})
 
-if idx < n && data[idx].TripID == tripId {
+	if idx < n && data[idx].TripID == tripId {
 
-end := idx
-for end < n && data[end].TripID == tripId {
-end++
-}
-return data[idx:end], true
-}
-return nil, false
-}
-
-func findStopTimeByTripAndStop(tripId, stopId string) (*TripStopTime, bool) {
-stops, found := findStopTimesByTripID(tripId)
-if !found {
-return nil, false
+		end := idx
+		for end < n && data[end].TripID == tripId {
+			end++
+		}
+		return data[idx:end], true
+	}
+	return nil, false
 }
 
-for i := range stops {
-if stops[i].StopID == stopId {
-return &stops[i], true
-}
-}
-return nil, false
-}
+func findStopTimeByTripAndStop(tripId, stopId string) (*StopTime, bool) {
+	stops, found := findStopTimesByTripID(tripId)
+	if !found {
+		return nil, false
+	}
 
+	for i := range stops {
+		if stops[i].StopID == stopId {
+			return &stops[i], true
+		}
+	}
+	return nil, false
+}
 
 // Shapes
 func findShapeById(shapeId string) ([]Shape, bool) {

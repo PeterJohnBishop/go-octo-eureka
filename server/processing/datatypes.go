@@ -43,6 +43,19 @@ type StopTime struct {
 	Timepoint         int     `json:"timepoint"`
 }
 
+type TripStopTime struct {
+	TripID            string  `json:"trip_id"`
+	ArrivalTime       string  `json:"arrival_time"`
+	DepartureTime     string  `json:"departure_time"`
+	StopID            string  `json:"stop_id"`
+	StopSequence      int     `json:"stop_sequence"`
+	StopHeadsign      string  `json:"stop_headsign"`
+	PickupType        int     `json:"pickup_type"`
+	DropOffType       int     `json:"drop_off_type"`
+	ShapeDistTraveled float64 `json:"shape_dist_traveled"`
+	Timepoint         int     `json:"timepoint"`
+}
+
 type Stop struct {
 	StopID             string  `json:"stop_id"`
 	StopCode           string  `json:"stop_code"`

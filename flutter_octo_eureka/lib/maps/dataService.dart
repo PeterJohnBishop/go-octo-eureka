@@ -130,8 +130,8 @@ class Dataservice {
     return StopTime.fromJson(data);
   }
 
-  Future<List<RouteTripShape>> fetchRouteTripShapes(double lat, double lon) async {
-    final data = await _get('/routes/lat/$lat/lon/$lon');
+  Future<List<RouteTripShape>> fetchRouteTripShapes(double lat, double lon, double radius) async {
+    final data = await _get('/routes/lat/$lat/lon/$lon/radius/$radius');
     return (data as List).map((json) => RouteTripShape.fromJson(json)).toList();
   }
 

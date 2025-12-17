@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'dart:math';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_octo_eureka/maps/dataService.dart';
@@ -43,6 +41,7 @@ class _MapViewState extends State<MapView> {
   Timer? _updateTimer;
   MapController _mapController = MapController();
   Marker? _userLocationMarker;
+  final LayerHitNotifier<Object> _hitNotifier = ValueNotifier(null);
 
   @override
   void initState() {
@@ -67,8 +66,11 @@ class _MapViewState extends State<MapView> {
   }
 
   Future<void> _fetchAndBuildNearPolylines(double lat, double lon) async {
+    setState(() {
+      _activePolylines = [];
+    });
     try {
-      final data = await dataservice.fetchRouteTripShapes(lat, lon);
+      final data = await dataservice.fetchRouteTripShapes(lat, lon, 1.0);
       if (data.isEmpty) return;
 
       final uniqueRouteIds = data.map((d) => d.routeId).toSet();
@@ -102,7 +104,9 @@ class _MapViewState extends State<MapView> {
         if (route != null && shapePoints != null && shapePoints.isNotEmpty) {
           final color = uiService.colorFromHex(route.routeColor);
 
-          tempPolylines.addAll(uiService.buildTripPolyline(shapePoints, color));
+          tempPolylines.addAll(
+            uiService.buildTripPolyline(route.routeId, shapePoints, color),
+          );
         }
       }
 
@@ -238,25 +242,40 @@ class _MapViewState extends State<MapView> {
   // load trips for selected route to draw vehicles
   Future<void> _loadTrips(List<VehiclePositionEntity> vehicles) async {
     setState(() => _isLoading = true);
+
     final selectedVehicles = vehicles.where((entity) {
       return entity.vehicle.trip.routeId == _selectedRouteId;
     }).toList();
-    if (selectedVehicles.isEmpty) return;
+
+    if (selectedVehicles.isEmpty) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
     try {
       final results = await Future.wait(
         selectedVehicles.map(
           (v) => dataservice.fetchTripById(v.vehicle.trip.tripId),
         ),
       );
-      if (results.isEmpty) return;
+
+      if (results.isEmpty) {
+        setState(() => _isLoading = false);
+        return;
+      }
+
       final trips = results.whereType<Trip>().toList();
-      if (trips.isEmpty) return;
+
       if (mounted) {
         setState(() {
           _selectedVehicles = selectedVehicles;
           _trips = trips;
-          _isLoading = false;
         });
+
+        if (_selectedRouteId != null) {
+          await _loadRouteTripDetails(_trips, _selectedRouteId!);
+        }
+
         _showVehicles();
       }
     } catch (e) {
@@ -268,11 +287,12 @@ class _MapViewState extends State<MapView> {
   // if vehicle tapped, load trip details
   Future<void> _loadTripDetails(String tripId, Color colorFromHex) async {
     setState(() => _isLoading = true);
-    final trip = _trips.firstWhere((t) {
-      return t.tripId == tripId;
-    });
+
     try {
+      final trip = _trips.firstWhere((t) => t.tripId == tripId);
+
       final List<Shape> shapes = await dataservice.fetchShapeById(trip.shapeId);
+
       final List<StopTime> stopTimes = await dataservice.fetchStopTimesByTripId(
         tripId,
       );
@@ -284,23 +304,34 @@ class _MapViewState extends State<MapView> {
 
       var stops = <Stop>[];
       if (stopTimes.isNotEmpty) {
-        stops = await Future.wait(
-          stopTimes.map((st) => dataservice.fetchStopById(st.stopId)),
-        );
+        final uniqueStopIds = stopTimes.map((st) => st.stopId).toSet().toList();
+
+        for (var i = 0; i < uniqueStopIds.length; i += 20) {
+          final end = (i + 20 < uniqueStopIds.length)
+              ? i + 20
+              : uniqueStopIds.length;
+          final batch = uniqueStopIds.sublist(i, end);
+
+          final batchResults = await Future.wait(
+            batch.map((id) => dataservice.fetchStopById(id)),
+          );
+          stops.addAll(batchResults);
+        }
       }
 
-      var selectedVehicle = _selectedVehicles.firstWhere((v) {
-        return v.id == _selectedVehicleId;
-      });
+      var selectedVehicle = _selectedVehicles.firstWhere(
+        (v) => v.id == _selectedVehicleId,
+        orElse: () => _selectedVehicles.first,
+      );
 
       if (mounted) {
         setState(() {
           _stopTimes = stopTimes;
+
           List<Shape> optimizedShapes = shapes;
           if (shapes.length > 500) {
             optimizedShapes = [];
             for (int i = 0; i < shapes.length; i++) {
-              // Keep first, last, and every nth point
               if (i == 0 || i == shapes.length - 1 || i % 3 == 0) {
                 optimizedShapes.add(shapes[i]);
               }
@@ -308,7 +339,12 @@ class _MapViewState extends State<MapView> {
           }
           _shapes = optimizedShapes;
           _stops = stops;
-          _activePolylines = uiService.buildTripPolyline(shapes, colorFromHex);
+
+          _activePolylines = uiService.buildTripPolyline(
+            null, // Hit value can be null or tripId
+            shapes,
+            colorFromHex,
+          );
 
           _stopMarkers = uiService.buildStopMarkers(
             selectedVehicle,
@@ -316,7 +352,109 @@ class _MapViewState extends State<MapView> {
             stops,
             colorFromHex,
           );
-          // _zoomToFit(_mappedStopPositions);
+
+          _isLoading = false;
+        });
+        // _zoomToFit(_mappedStopPositions);
+        _showVehicles();
+      }
+    } catch (e) {
+      debugPrint("Error loading single trip details: $e");
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadRouteTripDetails(List<Trip> trips, String routeId) async {
+    setState(() => _isLoading = true);
+
+    try {
+      var route = _routes.firstWhere((r) => r.routeId == routeId);
+      final colorFromHex = uiService.colorFromHex(route.routeColor);
+
+      final uniqueShapeIds = trips.map((t) => t.shapeId).toSet().toList();
+      final Map<String, List<Shape>> shapeMap = {};
+
+      for (var i = 0; i < uniqueShapeIds.length; i += 10) {
+        final end = (i + 10 < uniqueShapeIds.length)
+            ? i + 10
+            : uniqueShapeIds.length;
+        final batch = uniqueShapeIds.sublist(i, end);
+
+        await Future.wait(
+          batch.map((shapeId) async {
+            final fetchedShapes = await dataservice.fetchShapeById(shapeId);
+
+            List<Shape> optimizedShapes = fetchedShapes;
+            if (fetchedShapes.length > 500) {
+              optimizedShapes = [];
+              for (int k = 0; k < fetchedShapes.length; k++) {
+                if (k == 0 || k == fetchedShapes.length - 1 || k % 3 == 0) {
+                  optimizedShapes.add(fetchedShapes[k]);
+                }
+              }
+            }
+            shapeMap[shapeId] = optimizedShapes;
+          }),
+        );
+      }
+
+      final List<StopTime> allStopTimes = [];
+
+      for (var i = 0; i < trips.length; i += 20) {
+        final end = (i + 20 < trips.length) ? i + 20 : trips.length;
+        final batch = trips.sublist(i, end);
+
+        final batchResults = await Future.wait(
+          batch.map((t) => dataservice.fetchStopTimesByTripId(t.tripId)),
+        );
+
+        allStopTimes.addAll(batchResults.expand((x) => x));
+      }
+
+      final uniqueStopIds = allStopTimes
+          .map((st) => st.stopId)
+          .toSet()
+          .toList();
+      final List<Stop> allStops = [];
+
+      // Process stops in batches of 20
+      for (var i = 0; i < uniqueStopIds.length; i += 20) {
+        final end = (i + 20 < uniqueStopIds.length)
+            ? i + 20
+            : uniqueStopIds.length;
+        final batch = uniqueStopIds.sublist(i, end);
+
+        final batchResults = await Future.wait(
+          batch.map((id) => dataservice.fetchStopById(id)),
+        );
+        allStops.addAll(batchResults);
+      }
+
+      _mappedStopPositions.clear();
+      for (var shapeList in shapeMap.values) {
+        for (var s in shapeList) {
+          _mappedStopPositions.add(LatLng(s.shapePtLat, s.shapePtLon));
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _stopTimes = allStopTimes;
+          _stops = allStops;
+          _shapes = shapeMap.values.expand((x) => x).toList();
+
+          _activePolylines = [];
+          shapeMap.forEach((id, shapeList) {
+            _activePolylines.addAll(
+              uiService.buildTripPolyline(null, shapeList, colorFromHex),
+            );
+          });
+
+          _stopMarkers = uiService.buildSimpleStopMarkers(_stops, colorFromHex);
+
+          // Optional: Zoom to fit
+          _zoomToFit(_mappedStopPositions);
+
           _isLoading = false;
         });
         _showVehicles();
@@ -331,7 +469,11 @@ class _MapViewState extends State<MapView> {
     _vehicleMarkers.clear();
     _mappededVehiclePositions.clear();
 
-    VehiclePositionEntity? targetVehicleToZoom;
+    final route = _routes.firstWhere(
+      (route) => route.routeId == _selectedRouteId,
+      orElse: () => _routes.first,
+    );
+    final Color iconColor = uiService.colorFromHex(route.routeColor);
 
     for (var vehicle in _selectedVehicles) {
       final lat = vehicle.vehicle.position.latitude;
@@ -340,25 +482,12 @@ class _MapViewState extends State<MapView> {
 
       final bool isSelectedCurrent = _selectedVehicleId == vehicle.id;
 
-      if (isSelectedCurrent) {
-        targetVehicleToZoom = vehicle;
-      }
-
-      final route = _routes.firstWhere(
-        (route) => route.routeId == _selectedRouteId,
-        orElse: () => _routes.first,
-      );
-
-      IconData iconData;
-      if (route.routeType == 0 || route.routeType == 2) {
-        iconData = Icons.train;
-      } else {
-        iconData = Icons.directions_bus;
-      }
+      IconData iconData = (route.routeType == 0 || route.routeType == 2)
+          ? Icons.train
+          : Icons.directions_bus;
 
       final bearing = vehicle.vehicle.position.bearing;
       final double bearingRadians = bearing * (pi / 180);
-      final Color iconColor = uiService.colorFromHex(route.routeColor);
 
       final unixTimestamp = vehicle.vehicle.timestamp;
       final DateTime date = DateTime.fromMillisecondsSinceEpoch(
@@ -411,8 +540,8 @@ class _MapViewState extends State<MapView> {
               _shapes = [];
               _stops = [];
               _stopMarkers = [];
+              _activePolylines = [];
             });
-
             _showVehicles();
             _loadTripDetails(vehicle.vehicle.trip.tripId, iconColor);
           },
@@ -435,16 +564,6 @@ class _MapViewState extends State<MapView> {
 
     setState(() {
       _activeMarkers = [..._stopMarkers, ..._vehicleMarkers];
-
-      if (targetVehicleToZoom != null) {
-        var vlong = targetVehicleToZoom!.vehicle.position.longitude;
-        var vlat = targetVehicleToZoom!.vehicle.position.latitude;
-
-        _mapController.move(LatLng(vlat, vlong), 14.0);
-      } else {
-        _zoomToFit(_mappededVehiclePositions);
-      }
-      _isLoading = false;
     });
   }
 
@@ -551,7 +670,17 @@ class _MapViewState extends State<MapView> {
             elevation: 4,
             backgroundColor: Colors.white,
             onPressed: () async {
-              setState(() => _isLoading = true);
+              setState(() {
+                _selectedRouteId = null;
+                _selectedVehicleId = null;
+                _activePolylines = [];
+                _activeMarkers = [];
+                _vehicleMarkers = [];
+                _stopMarkers = [];
+                _stopTimes = [];
+                _shapes = [];
+                _stops = [];
+              });
               await _determinePosition();
               setState(() => _isLoading = false);
             },
@@ -578,19 +707,19 @@ class _MapViewState extends State<MapView> {
                 flags: InteractiveFlag.all,
               ),
               onTap: (tapPosition, point) {
-                if (_selectedVehicleId != null) {
-                  setState(() {
-                    _selectedVehicleId = null;
-                    _activePolylines = [];
-                    _activeMarkers = [];
-                    _vehicleMarkers = [];
-                    _stopMarkers = [];
-                    _stopTimes = [];
-                    _shapes = [];
-                    _stops = [];
-                    _loadTrips(_vehiclePositions);
-                  });
-                }
+                setState(() {
+                  _selectedRouteId = null;
+                  _selectedVehicleId = null;
+                  _activePolylines = [];
+                  _activeMarkers = [];
+                  _vehicleMarkers = [];
+                  _stopMarkers = [];
+                  _stopTimes = [];
+                  _shapes = [];
+                  _stops = [];
+                });
+                // _loadTrips(_vehiclePositions);
+                _determinePosition();
               },
             ),
             children: [
@@ -599,9 +728,34 @@ class _MapViewState extends State<MapView> {
                 userAgentPackageName: 'com.flutter_octo_eureka.app',
               ),
               _activePolylines.isNotEmpty
-                  ? PolylineLayer(
-                      polylines: _activePolylines,
-                      cullingMargin: 50.0,
+                  ? GestureDetector(
+                      onTap: () {
+                        final hitResult = _hitNotifier.value;
+                        if (hitResult != null) {
+                          final hitValues = hitResult.hitValues;
+                          if (hitValues.isNotEmpty) {
+                            final tappedData = hitValues.first;
+                            setState(() {
+                              _selectedVehicles = [];
+                              _trips = [];
+                              _stopTimes = [];
+                              _shapes = [];
+                              _stops = [];
+                              _activePolylines = [];
+                              _activeMarkers = [];
+                              _vehicleMarkers = [];
+                              _stopMarkers = [];
+                              _selectedRouteId = "$tappedData";
+                            });
+                            _loadTrips(_vehiclePositions);
+                          }
+                        }
+                      },
+                      child: PolylineLayer(
+                        hitNotifier: _hitNotifier,
+                        polylines: _activePolylines,
+                        cullingMargin: 50.0,
+                      ),
                     )
                   : Container(),
               _vehicleMarkers.isNotEmpty
@@ -665,6 +819,7 @@ class _MapViewState extends State<MapView> {
                                   _activePolylines = [];
                                   _activeMarkers = [];
                                   _vehicleMarkers = [];
+                                  _stopMarkers = [];
                                   // set selected route
                                   _selectedRouteId = value;
                                 });

@@ -297,7 +297,7 @@ func HandleNearRoutes(c *gin.Context) {
 		return
 	}
 
-	radius, err = strconv.ParseFloat(radiusStr, 64)
+	radius, err := strconv.ParseFloat(radiusStr, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid radius"})
 		return

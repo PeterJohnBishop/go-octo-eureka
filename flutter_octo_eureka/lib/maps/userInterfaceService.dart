@@ -161,24 +161,27 @@ class UserInterfaceService {
     );
   }
 
-  List<Polyline<Object>> buildTripPolyline(
-    List<Shape> shapes,
-    Color colorFromHex,
-  ) {
-    shapes.sort((a, b) => a.shapePtSequence.compareTo(b.shapePtSequence));
+List<Polyline<Object>> buildTripPolyline(
+  String? routeId,
+  List<Shape> shapes,
+  Color colorFromHex,
+) {
+  shapes.sort((a, b) => a.shapePtSequence.compareTo(b.shapePtSequence));
 
-    final points = shapes
-        .map((s) => LatLng(s.shapePtLat, s.shapePtLon))
-        .toList();
+  final points = shapes
+      .map((s) => LatLng(s.shapePtLat, s.shapePtLon))
+      .toList();
 
-    final polyline = Polyline(
-      points: points,
-      strokeWidth: 4.0,
-      color: colorFromHex,
-    );
+  final polyline = Polyline<Object>(
+    points: points,
+    strokeWidth: 4.0,
+    color: colorFromHex,
+    useStrokeWidthInMeter: false,
+    hitValue: routeId, 
+  );
 
-    return [polyline];
-  }
+  return [polyline];
+}
 
   List<Marker> buildStopMarkers(
     VehiclePositionEntity vehicle,
@@ -220,7 +223,7 @@ class UserInterfaceService {
             arrivalTime: convertedArrival,
             departureTime: convertedDeparture,
             color: colorFromHex,
-            vehicle: vehicle!,
+            vehicle: vehicle,
             stopTimes: stopTimes,
             stops: stops,
           ),
@@ -230,6 +233,30 @@ class UserInterfaceService {
 
     return newStopMarkers;
   }
+
+  List<Marker> buildSimpleStopMarkers(
+  List<Stop> stops,
+  Color colorFromHex,
+) {
+  List<Marker> newStopMarkers = [];
+
+  for (var stop in stops) {
+    newStopMarkers.add(
+      Marker(
+        point: LatLng(stop.stopLat, stop.stopLon),
+        width: 200.0, 
+        height: 175.0, 
+        alignment: Alignment.center,
+        child: SimpleStopMarkerPopup(
+          stopName: stop.stopName,
+          color: colorFromHex,
+        ),
+      ),
+    );
+  }
+
+  return newStopMarkers;
+}
 
   Color colorFromHex(String hexColor) {
     String color = hexColor.toUpperCase().replaceAll('#', '');
@@ -634,13 +661,9 @@ class _StopMarkerPopupState extends State<StopMarkerPopup> {
         final double bottomSpacer = (constraints.maxHeight / 2) - 7.0;
 
         return OverflowBox(
-          // 1. Allow the column to grow as tall as it needs
           minHeight: 0,
           maxHeight: double.infinity,
-          // 2. Allow it to be as wide as needed (prevents horizontal clipping)
           maxWidth: double.infinity,
-          // 3. Anchor everything to the bottom so the spacer pushes the marker
-          //    to the correct vertical center relative to the map coordinate.
           alignment: Alignment.bottomCenter,
           child: Column(
             mainAxisAlignment: MainAxisAlignment.end,
@@ -731,6 +754,109 @@ class _StopMarkerPopupState extends State<StopMarkerPopup> {
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 2,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              SizedBox(height: bottomSpacer),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class SimpleStopMarkerPopup extends StatefulWidget {
+  final String stopName;
+  final Color color;
+
+  const SimpleStopMarkerPopup({
+    super.key,
+    required this.stopName,
+    required this.color,
+  });
+
+  @override
+  State<SimpleStopMarkerPopup> createState() => _SimpleStopMarkerPopupState();
+}
+
+class _SimpleStopMarkerPopupState extends State<SimpleStopMarkerPopup> {
+  bool _showDetail = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double bottomSpacer = (constraints.maxHeight / 2) - 7.0;
+
+        return OverflowBox(
+          minHeight: 0,
+          maxHeight: double.infinity,
+          maxWidth: double.infinity,
+          alignment: Alignment.bottomCenter,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_showDetail)
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _showDetail = false;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 6,
+                    ),
+                    margin: const EdgeInsets.only(bottom: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: widget.color, width: 1.5),
+                      borderRadius: BorderRadius.circular(6),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.3),
+                          blurRadius: 2,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      widget.stopName,
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontSize: 12, 
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 2, 
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _showDetail = !_showDetail;
+                  });
+                },
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: widget.color, width: 4),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
                         blurRadius: 2,
                         offset: const Offset(0, 1),
                       ),

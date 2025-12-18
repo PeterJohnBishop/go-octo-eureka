@@ -257,5 +257,57 @@ class DataService {
       return (<StopTime>[], <Stop>[], <String, List<Shape>>{});
     }
   }
+
+  Future<(List<Shape>, List<StopTime>, List<Stop>)> fetchTripDetails(List<Trip> trips, String tripId, List<VehiclePositionEntity> selectedVehicles, String _selectedVehicleId) async {
+    try {
+      final trip = trips.firstWhere((t) => t.tripId == tripId);
+
+      final List<Shape> shapes = await api.fetchShapeById(trip.shapeId);
+
+      final List<StopTime> stopTimes = await api.fetchStopTimesByTripId(tripId);
+
+      var stops = <Stop>[];
+      if (stopTimes.isNotEmpty) {
+        final uniqueStopIds = stopTimes.map((st) => st.stopId).toSet().toList();
+
+        for (var i = 0; i < uniqueStopIds.length; i += 20) {
+          final end = (i + 20 < uniqueStopIds.length)
+              ? i + 20
+              : uniqueStopIds.length;
+          final batch = uniqueStopIds.sublist(i, end);
+
+          final batchResults = await Future.wait(
+            batch.map((id) => api.fetchStopById(id)),
+          );
+          stops.addAll(batchResults);
+        }
+      }
+
+      var selectedVehicle = selectedVehicles.firstWhere(
+        (v) => v.id == _selectedVehicleId,
+        orElse: () => selectedVehicles.first,
+      );
+
+      List<Shape> optimizedShapes = shapes;
+          if (shapes.length > 500) {
+            optimizedShapes = [];
+            for (int i = 0; i < shapes.length; i++) {
+              if (i == 0 || i == shapes.length - 1 || i % 3 == 0) {
+                optimizedShapes.add(shapes[i]);
+              }
+            }
+          }
+
+      return (
+        optimizedShapes,
+        stopTimes,
+        stops,
+        );
+      
+    } catch (e) {
+      debugPrint("Error loading single trip details: $e");
+      return (<Shape>[], <StopTime>[], <Stop>[]);
+    }
+  }
 }
 

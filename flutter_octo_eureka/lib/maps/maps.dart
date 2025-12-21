@@ -156,7 +156,7 @@ class _MapViewState extends State<MapView> {
     if (_selectedRouteId != null) {
       await _handleRouteTripDetailLoading(trips, _selectedRouteId!);
     }
-    _showVehicles();
+    _handleVehicleMarkers();
   }
 
   Future<void> _handleRouteTripDetailLoading(
@@ -194,7 +194,7 @@ class _MapViewState extends State<MapView> {
         _zoomToFit(_mappedStopPositions);
         _isLoading = false;
       });
-      _showVehicles();
+      _handleVehicleMarkers();
     }
   }
 
@@ -214,8 +214,6 @@ class _MapViewState extends State<MapView> {
     (shapes, stopTimes, stops) = await dataService.fetchTripDetails(
       _trips,
       tripId,
-      _selectedVehicles,
-      _selectedVehicleId!,
     );
     // if (shapes.isEmpty || stopTimes.isEmpty || stops.isEmpty) handle error!!!
     if (mounted) {
@@ -239,114 +237,47 @@ class _MapViewState extends State<MapView> {
         stops,
         colorFromHex,
       );
-      _showVehicles();
+      _handleVehicleMarkers();
       _isLoading = false;
     }
   }
 
-  void _showVehicles() {
-    _vehicleMarkers.clear();
-    _mappededVehiclePositions.clear();
-
-    final route = _routes.firstWhere(
-      (route) => route.routeId == _selectedRouteId,
-      orElse: () => _routes.first,
+  void _handleVehicleMarkers() {
+    final (newMarkers, newPositions) = dataService.fetchVehicleMarkers(
+      selectedVehicles: _selectedVehicles,
+      routes: _routes,
+      trips: _trips,
+      stops: _stops,
+      stopTimes: _stopTimes,
+      selectedRouteId: _selectedRouteId,
+      selectedVehicleId: _selectedVehicleId,
+      onVehicleTap: (vehicle, iconColor) {
+        setState(() {
+          _selectedVehicleId = vehicle.id;
+          _stopTimes = [];
+          _shapes = [];
+          _stops = [];
+          _stopMarkers = [];
+          _activePolylines = [];
+        });
+        _handleVehicleMarkers();
+        _handleTripDetailLoading(vehicle.vehicle.trip.tripId, iconColor);
+      },
     );
-    final Color iconColor = uiService.colorFromHex(route.routeColor);
-
-    for (var vehicle in _selectedVehicles) {
-      final lat = vehicle.vehicle.position.latitude;
-      final lon = vehicle.vehicle.position.longitude;
-      _mappededVehiclePositions.add(LatLng(lat, lon));
-
-      final bool isSelectedCurrent = _selectedVehicleId == vehicle.id;
-
-      IconData iconData = (route.routeType == 0 || route.routeType == 2)
-          ? Icons.train
-          : Icons.directions_bus;
-
-      final bearing = vehicle.vehicle.position.bearing;
-      final double bearingRadians = bearing * (pi / 180);
-
-      final unixTimestamp = vehicle.vehicle.timestamp;
-      final DateTime date = DateTime.fromMillisecondsSinceEpoch(
-        unixTimestamp * 1000,
-      );
-      final String formattedTime = DateFormat('h:mm a').format(date);
-
-      Widget markerContent = VehiclePinIcon(
-        iconColor: iconColor,
-        vehicleIconData: iconData,
-        size: 45.0,
-        bearing: bearingRadians,
-      );
-
-      if (isSelectedCurrent) {
-        final trip = _trips.firstWhere(
-          (t) => t.tripId == vehicle.vehicle.trip.tripId,
-          orElse: () => _trips.first,
-        );
-
-        Stop? currentStop;
-        try {
-          currentStop = _stops.firstWhere(
-            (s) => s.stopId == vehicle.vehicle.stopId,
-          );
-        } catch (e) {
-          currentStop = null;
-        }
-
-        markerContent = VehicleMarkerMenu(
-          isBus: route.routeType == 0 || route.routeType == 2 ? false : true,
-          headsign: trip.tripHeadsign,
-          timestamp: formattedTime,
-          status: vehicle.vehicle.currentStatus,
-          stop: currentStop,
-          onCompassPressed: () => debugPrint("Compass tapped"),
-          onWarningPressed: () => debugPrint("Warning tapped"),
-          onInfoPressed: () => debugPrint("Info tapped"),
-          vehicle: vehicle,
-          stopTimes: _stopTimes,
-          stops: _stops,
-          child: markerContent,
-        );
-      } else {
-        markerContent = GestureDetector(
-          onTap: () {
-            setState(() {
-              _selectedVehicleId = vehicle.id;
-              _stopTimes = [];
-              _shapes = [];
-              _stops = [];
-              _stopMarkers = [];
-              _activePolylines = [];
-            });
-            _showVehicles();
-            _handleTripDetailLoading(vehicle.vehicle.trip.tripId, iconColor);
-          },
-          child: markerContent,
-        );
-      }
-
-      final double baseSize = isSelectedCurrent ? 120.0 : 50.0;
-
-      _vehicleMarkers.add(
-        Marker(
-          point: LatLng(lat, lon),
-          width: baseSize,
-          height: baseSize,
-          alignment: Alignment.center,
-          child: markerContent,
-        ),
-      );
-    }
 
     setState(() {
+      _vehicleMarkers = newMarkers;
+      _mappededVehiclePositions = newPositions;
       _activeMarkers = [..._stopMarkers, ..._vehicleMarkers];
     });
   }
 
   Future<void> _determinePosition() async {
+    // 1. Define Denver constants
+    const double denverLat = 39.7452;
+    const double denverLon = -104.9922;
+    const double hundredMilesInMeters = 160934.0;
+
     bool serviceEnabled;
     LocationPermission permission;
 
@@ -370,9 +301,40 @@ class _MapViewState extends State<MapView> {
       return;
     }
 
-    var position = await Geolocator.getCurrentPosition();
+    Position position = await Geolocator.getCurrentPosition();
+
+    // Calculate distance from Denver
+    double distanceInMeters = Geolocator.distanceBetween(
+      position.latitude,
+      position.longitude,
+      denverLat,
+      denverLon,
+    );
+
+    double finalLat = position.latitude;
+    double finalLon = position.longitude;
+
+    if (distanceInMeters > hundredMilesInMeters) {
+      debugPrint('User is > 100 miles from Denver');
+      finalLat = denverLat;
+      finalLon = denverLon;
+
+      position = Position(
+        latitude: denverLat,
+        longitude: denverLon,
+        timestamp: DateTime.now(),
+        accuracy: 0.0,
+        altitude: 0.0,
+        heading: 0.0,
+        speed: 0.0,
+        speedAccuracy: 0.0,
+        altitudeAccuracy: 0.0,
+        headingAccuracy: 0.0,
+      );
+    }
+
     _updateUserMarker(position);
-    _handlePolylineLoading(position.latitude, position.longitude, 1.0);
+    _handlePolylineLoading(finalLat, finalLon, 1.0);
   }
 
   void _updateUserMarker(Position position) {

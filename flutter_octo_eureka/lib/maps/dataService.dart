@@ -3,6 +3,8 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_octo_eureka/maps/ApiService.dart';
 import 'package:flutter_octo_eureka/maps/gtfsTypes.dart';
 import 'package:flutter_octo_eureka/maps/userInterfaceService.dart';
+import 'package:intl/intl.dart';
+import 'package:latlong2/latlong.dart';
 
 class DataService {
   ApiService api = ApiService();
@@ -258,7 +260,7 @@ class DataService {
     }
   }
 
-  Future<(List<Shape>, List<StopTime>, List<Stop>)> fetchTripDetails(List<Trip> trips, String tripId, List<VehiclePositionEntity> selectedVehicles, String _selectedVehicleId) async {
+  Future<(List<Shape>, List<StopTime>, List<Stop>)> fetchTripDetails(List<Trip> trips, String tripId) async {
     try {
       final trip = trips.firstWhere((t) => t.tripId == tripId);
 
@@ -283,11 +285,6 @@ class DataService {
         }
       }
 
-      var selectedVehicle = selectedVehicles.firstWhere(
-        (v) => v.id == _selectedVehicleId,
-        orElse: () => selectedVehicles.first,
-      );
-
       List<Shape> optimizedShapes = shapes;
           if (shapes.length > 500) {
             optimizedShapes = [];
@@ -309,5 +306,96 @@ class DataService {
       return (<Shape>[], <StopTime>[], <Stop>[]);
     }
   }
+
+  (List<Marker>, List<LatLng>) fetchVehicleMarkers({
+  required List<VehiclePositionEntity> selectedVehicles,
+  required List<gtfsRoute> routes,
+  required List<Trip> trips,
+  required List<Stop> stops,
+  required List<StopTime> stopTimes,
+  required String? selectedRouteId,
+  required String? selectedVehicleId,
+  required Function(dynamic vehicle, Color routeColor) onVehicleTap,
+}) {
+  final List<Marker> vehicleMarkers = [];
+  final List<LatLng> mappedPositions = [];
+  final UserInterfaceService uiService = UserInterfaceService();
+
+  final route = routes.firstWhere(
+    (r) => r.routeId == selectedRouteId,
+    orElse: () => routes.first,
+  );
+  final Color iconColor = uiService.colorFromHex(route.routeColor);
+
+  for (var vehicle in selectedVehicles) {
+    final lat = vehicle.vehicle.position.latitude;
+    final lon = vehicle.vehicle.position.longitude;
+    final latLng = LatLng(lat, lon);
+    mappedPositions.add(latLng);
+
+    final bool isSelected = selectedVehicleId == vehicle.id;
+    final double bearing = vehicle.vehicle.position.bearing;
+    
+    final IconData iconData = (route.routeType == 0 || route.routeType == 2)
+        ? Icons.train
+        : Icons.directions_bus;
+
+    final String formattedTime = DateFormat('h:mm a').format(
+      DateTime.fromMillisecondsSinceEpoch(vehicle.vehicle.timestamp * 1000),
+    );
+
+    Widget markerContent = VehiclePinIcon(
+      iconColor: iconColor,
+      vehicleIconData: iconData,
+      size: 45.0,
+      bearing: bearing * (3.1415926535897932 / 180), 
+    );
+
+    if (isSelected) {
+      final trip = trips.firstWhere(
+        (t) => t.tripId == vehicle.vehicle.trip.tripId,
+        orElse: () => trips.first,
+      );
+
+      final currentStop = stops.cast<Stop?>().firstWhere(
+        (s) => s?.stopId == vehicle.vehicle.stopId,
+        orElse: () => null,
+      );
+
+      markerContent = VehicleMarkerMenu(
+        isBus: !(route.routeType == 0 || route.routeType == 2),
+        headsign: trip.tripHeadsign,
+        timestamp: formattedTime,
+        status: vehicle.vehicle.currentStatus,
+        stop: currentStop,
+        vehicle: vehicle,
+        stopTimes: stopTimes,
+        stops: stops,
+        onCompassPressed: () => debugPrint("Compass tapped"),
+        onWarningPressed: () => debugPrint("Warning tapped"),
+        onInfoPressed: () => debugPrint("Info tapped"),
+        child: markerContent,
+      );
+    } else {
+      markerContent = GestureDetector(
+        onTap: () => onVehicleTap(vehicle, iconColor),
+        child: markerContent,
+      );
+    }
+
+    vehicleMarkers.add(
+      Marker(
+        point: latLng,
+        width: isSelected ? 120.0 : 50.0,
+        height: isSelected ? 120.0 : 50.0,
+        alignment: Alignment.center,
+        child: markerContent,
+      ),
+    );
+  }
+
+  return (vehicleMarkers, mappedPositions);
+}
+
 }
 

@@ -109,14 +109,12 @@ class UserInterfaceService {
       final bool hasAlerts = checkRouteAlerts(alerts, route.routeId);
 
       return ListTile(
-        leading: Container(
-              width: 14,
-              height: 14,
-              decoration: BoxDecoration(
-                color: routeColor,
-                shape: BoxShape.circle,
-              ),
-            ),
+        leading: Icon((route.routeType == 0 || route.routeType == 2)
+        ? Icons.train
+        : Icons.directions_bus,
+        color: routeColor,
+        size: 24,
+        ),
         title: Text(
           "${route.routeShortName}: ${route.routeLongName}",
           softWrap: true, // Allow wrapping

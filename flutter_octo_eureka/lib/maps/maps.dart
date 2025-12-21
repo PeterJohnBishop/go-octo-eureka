@@ -5,7 +5,6 @@ import 'package:flutter_octo_eureka/maps/ApiService.dart';
 import 'package:flutter_octo_eureka/maps/dataService.dart';
 import 'package:flutter_octo_eureka/maps/gtfsTypes.dart';
 import 'package:flutter_octo_eureka/maps/userInterfaceService.dart';
-import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:geolocator/geolocator.dart';
@@ -339,10 +338,10 @@ class _MapViewState extends State<MapView> {
         width: 35.0,
         height: 35.0,
         child: Icon(
-                Icons.person_pin_circle_sharp,
-                color: Colors.yellow[900],
-                size: 40.0,
-              ),
+          Icons.person_pin_circle_sharp,
+          color: Colors.yellow[900],
+          size: 40.0,
+        ),
       );
       _mapController.move(LatLng(position.latitude, position.longitude), 13.0);
     });
@@ -380,12 +379,54 @@ class _MapViewState extends State<MapView> {
     }
   }
 
+  String? encodeQueryParameters(Map<String, String> params) {
+    return params.entries
+        .map(
+          (MapEntry<String, String> e) =>
+              '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}',
+        )
+        .join('&');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
+          const SizedBox(height: 8),
+          FloatingActionButton.small(
+            heroTag: "feedback",
+            onPressed: () {
+              final Uri emailLaunchUri = Uri(
+                scheme: 'mailto',
+                path: 'pjb.den@gmail.com',
+                query: encodeQueryParameters(<String, String>{
+                  'subject': 'Feedback & Feature Requests!',
+                }),
+              );
+              launchUrl(emailLaunchUri);
+            },
+            backgroundColor: Colors.white,
+            foregroundColor: Colors.black,
+            child: Icon(Icons.feedback),
+          ),
+          const SizedBox(height: 8),
+          FloatingActionButton.small(
+            heroTag: "refresh",
+            onPressed: () {
+              setState(() {
+                _handleAlertsLoading();
+                _handleVehiclePositionLoading();
+              });
+            },
+            backgroundColor: Colors.white,
+            foregroundColor: Colors.black,
+            child: _isLoading
+                ? const CircularProgressIndicator()
+                : Icon(Icons.refresh),
+          ),
+          const SizedBox(height: 8),
           FloatingActionButton.small(
             heroTag: "zoom_in",
             onPressed: _zoomIn,
@@ -545,13 +586,11 @@ class _MapViewState extends State<MapView> {
                         return name.contains(keyword);
                       }).toList();
 
-                      
                       return uiService.buildSearchListTiles(
                         context,
                         filteredRoutes,
                         _alerts,
                         (selectedRoute) {
-                        
                           controller.closeView(selectedRoute);
 
                           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -568,7 +607,7 @@ class _MapViewState extends State<MapView> {
                               _vehicleMarkers = [];
                               _stopMarkers = [];
                               _selectedRouteId = selectedRoute;
-          
+
                               if (selectedRoute != null) {
                                 _handleVehicleTripLoading(
                                   _vehiclePositions,

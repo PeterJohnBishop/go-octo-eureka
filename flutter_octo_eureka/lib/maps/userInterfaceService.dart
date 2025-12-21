@@ -89,6 +89,64 @@ class UserInterfaceService {
     }).toList();
   }
 
+   List<ListTile> buildSearchListTiles(
+    BuildContext context,
+    List<gtfsRoute> routes,
+    List<AlertEntity> alerts,
+    Function(String?) onTap
+  ) {
+    return routes.map((route) {
+      Color routeColor = Colors.black;
+      if (route.routeColor.isNotEmpty) {
+        try {
+          final hex = route.routeColor.replaceAll('#', '');
+          routeColor = Color(int.parse("0xFF$hex"));
+        } catch (_) {
+          // Keep default
+        }
+      }
+
+      final bool hasAlerts = checkRouteAlerts(alerts, route.routeId);
+
+      return ListTile(
+        leading: Container(
+              width: 14,
+              height: 14,
+              decoration: BoxDecoration(
+                color: routeColor,
+                shape: BoxShape.circle,
+              ),
+            ),
+        title: Text(
+          "${route.routeShortName}: ${route.routeLongName}",
+          softWrap: true, // Allow wrapping
+          maxLines: 2,
+        ),
+        onTap: () => onTap(route.routeId),
+        trailing: hasAlerts ?
+        GestureDetector(
+                onTap: () {
+                  final routeAlerts = alerts.where((alert) {
+                    return alert.alert.informedEntity.any(
+                      (entity) => entity.routeId == route.routeId,
+                    );
+                  }).toList();
+
+                  _showRouteAlertsDialog(context, route, routeAlerts);
+                },
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: Icon(
+                    Icons.warning_amber_rounded,
+                    color: Colors.amber,
+                    size: 20,
+                  ),
+                ),
+              ) : null
+      );
+    }).toList();
+  }
+
   void _showRouteAlertsDialog(
     BuildContext context,
     gtfsRoute route,

@@ -28,7 +28,6 @@ class _MapViewState extends State<MapView> {
   List<AlertEntity> _alerts = [];
   List<Marker> _vehicleMarkers = [];
   List<gtfsRoute> _routes = [];
-  List<DropdownMenuItem<String>> _routeMenuItems = [];
   List<AlertEntity> _activeAlerts = [];
   List<Trip> _trips = [];
   List<StopTime> _stopTimes = [];
@@ -115,13 +114,9 @@ class _MapViewState extends State<MapView> {
         .fetchVehiclePositionsData(context);
     // if (positions.isEmpty || routes.isEmpty || menuItems.isEmpty || uniqueRoutes.isEmpty) handle error!!!
     if (mounted) {
-      List<DropdownMenuItem<String>> menuItems = uiService
-          .buildRouteDropdownItems(context, routes, _alerts);
       setState(() {
         _vehiclePositions = positions;
         _routes = routes;
-        _routeMenuItems = menuItems;
-
         if (_selectedRouteId != null &&
             !uniqueRoutes.containsKey(_selectedRouteId)) {
           _selectedRouteId = null;
@@ -343,13 +338,13 @@ class _MapViewState extends State<MapView> {
         point: LatLng(position.latitude, position.longitude),
         width: 35.0,
         height: 35.0,
-        child: const Icon(
-          Icons.person_pin_circle_sharp,
-          color: Colors.blue,
-          size: 35.0,
-        ),
+        child: Icon(
+                Icons.person_pin_circle_sharp,
+                color: Colors.yellow[900],
+                size: 40.0,
+              ),
       );
-      _mapController.move(LatLng(position.latitude, position.longitude), 15.0);
+      _mapController.move(LatLng(position.latitude, position.longitude), 13.0);
     });
   }
 
@@ -427,9 +422,9 @@ class _MapViewState extends State<MapView> {
             },
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 5),
-              child: const Icon(
+              child: Icon(
                 Icons.person_pin_circle_sharp,
-                color: Colors.blue,
+                color: Colors.yellow[900],
                 size: 28.0,
               ),
             ),
@@ -529,83 +524,63 @@ class _MapViewState extends State<MapView> {
             child: Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Card(
-                    elevation: 4,
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12.0,
-                              vertical: 4.0,
-                            ),
-                            child: DropdownButton<String>(
-                              borderRadius: BorderRadius.circular(20),
-                              isExpanded: true,
-                              itemHeight: null,
-                              hint: const Text("Select Route"),
-                              value:
-                                  _routeMenuItems.any(
-                                    (item) => item.value == _selectedRouteId,
-                                  )
-                                  ? _selectedRouteId
-                                  : null,
-                              items: _routeMenuItems,
-                              underline: Container(),
-                              onChanged: (value) {
-                                setState(() {
-                                  _selectedVehicles = [];
-                                  _trips = [];
-                                  _stopTimes = [];
-                                  _shapes = [];
-                                  _stops = [];
-                                  _activePolylines = [];
-                                  _activeMarkers = [];
-                                  _vehicleMarkers = [];
-                                  _stopMarkers = [];
-                                  // set selected route
-                                  _selectedRouteId = value;
-                                });
-                                if (value == null) {
-                                  _handleVehicleTripLoading(
-                                    _vehiclePositions,
-                                    "",
-                                  );
-                                }
+                  padding: EdgeInsets.all(8),
+                  child: SearchAnchor(
+                    builder: (context, controller) {
+                      return SearchBar(
+                        controller: controller,
+                        hintText: "Search for a route...",
+                        onTap: () => controller.openView(),
+                        onChanged: (_) => controller.openView(),
+                        leading: const Icon(Icons.search),
+                      );
+                    },
+                    suggestionsBuilder: (context, controller) {
+                      final keyword = controller.text.toLowerCase();
+
+                      final filteredRoutes = _routes.where((route) {
+                        final name =
+                            "${route.routeShortName} ${route.routeLongName}"
+                                .toLowerCase();
+                        return name.contains(keyword);
+                      }).toList();
+
+                      
+                      return uiService.buildSearchListTiles(
+                        context,
+                        filteredRoutes,
+                        _alerts,
+                        (selectedRoute) {
+                        
+                          controller.closeView(selectedRoute);
+
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (!mounted) return;
+
+                            setState(() {
+                              _selectedVehicles = [];
+                              _trips = [];
+                              _stopTimes = [];
+                              _shapes = [];
+                              _stops = [];
+                              _activePolylines = [];
+                              _activeMarkers = [];
+                              _vehicleMarkers = [];
+                              _stopMarkers = [];
+                              _selectedRouteId = selectedRoute;
+          
+                              if (selectedRoute != null) {
                                 _handleVehicleTripLoading(
                                   _vehiclePositions,
-                                  value!,
+                                  selectedRoute,
                                 );
-                              },
-                            ),
-                          ),
-                        ),
-
-                        Container(
-                          width: 1,
-                          height: 32,
-                          color: Colors.grey.shade300,
-                        ),
-
-                        _isLoading
-                            ? Padding(
-                                padding: EdgeInsets.all(8),
-                                child: CircularProgressIndicator(),
-                              )
-                            : IconButton(
-                                icon: const Icon(Icons.refresh),
-                                color: Colors.grey[700],
-                                tooltip: 'Refresh Routes',
-                                onPressed: () {
-                                  setState(() {
-                                    _handleAlertsLoading();
-                                    _handleVehiclePositionLoading();
-                                  });
-                                },
-                              ),
-                      ],
-                    ),
+                              }
+                              ;
+                            });
+                          });
+                        },
+                      );
+                    },
                   ),
                 ),
               ],

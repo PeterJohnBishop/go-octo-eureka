@@ -18,82 +18,11 @@ class UserInterfaceService {
     return false;
   }
 
-  List<DropdownMenuItem<String>> buildRouteDropdownItems(
+  List<ListTile> buildSearchListTiles(
     BuildContext context,
     List<gtfsRoute> routes,
     List<AlertEntity> alerts,
-  ) {
-    return routes.map((route) {
-      Color routeColor = Colors.black;
-      if (route.routeColor.isNotEmpty) {
-        try {
-          final hex = route.routeColor.replaceAll('#', '');
-          routeColor = Color(int.parse("0xFF$hex"));
-        } catch (_) {
-          // Keep default
-        }
-      }
-
-      final bool hasAlerts = checkRouteAlerts(alerts, route.routeId);
-
-      return DropdownMenuItem<String>(
-        value: route.routeId,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-              width: 14,
-              height: 14,
-              decoration: BoxDecoration(
-                color: routeColor,
-                shape: BoxShape.circle,
-              ),
-            ),
-
-            const SizedBox(width: 8),
-
-            Expanded(
-              child: Text(
-                "${route.routeShortName}: ${route.routeLongName}",
-                style: const TextStyle(fontSize: 14),
-                softWrap: true, // Allow wrapping
-                maxLines: 2,
-              ),
-            ),
-
-            const SizedBox(width: 8),
-
-            if (hasAlerts)
-              GestureDetector(
-                onTap: () {
-                  final routeAlerts = alerts.where((alert) {
-                    return alert.alert.informedEntity.any(
-                      (entity) => entity.routeId == route.routeId,
-                    );
-                  }).toList();
-
-                  _showRouteAlertsDialog(context, route, routeAlerts);
-                },
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: Icon(
-                    Icons.warning_amber_rounded,
-                    color: Colors.amber,
-                    size: 20,
-                  ),
-                ),
-              ),
-          ],
-        ),
-      );
-    }).toList();
-  }
-
-   List<ListTile> buildSearchListTiles(
-    BuildContext context,
-    List<gtfsRoute> routes,
-    List<AlertEntity> alerts,
-    Function(String?) onTap
+    Function(String?) onTap,
   ) {
     return routes.map((route) {
       Color routeColor = Colors.black;
@@ -109,11 +38,12 @@ class UserInterfaceService {
       final bool hasAlerts = checkRouteAlerts(alerts, route.routeId);
 
       return ListTile(
-        leading: Icon((route.routeType == 0 || route.routeType == 2)
-        ? Icons.train
-        : Icons.directions_bus,
-        color: routeColor,
-        size: 24,
+        leading: Icon(
+          (route.routeType == 0 || route.routeType == 2)
+              ? Icons.train
+              : Icons.directions_bus,
+          color: routeColor,
+          size: 24,
         ),
         title: Text(
           "${route.routeShortName}: ${route.routeLongName}",
@@ -121,16 +51,15 @@ class UserInterfaceService {
           maxLines: 2,
         ),
         onTap: () => onTap(route.routeId),
-        trailing: hasAlerts ?
-        GestureDetector(
+        trailing: hasAlerts
+            ? GestureDetector(
                 onTap: () {
                   final routeAlerts = alerts.where((alert) {
                     return alert.alert.informedEntity.any(
                       (entity) => entity.routeId == route.routeId,
                     );
                   }).toList();
-
-                  _showRouteAlertsDialog(context, route, routeAlerts);
+                  showRouteAlertsDialog(context, route, routeAlerts);
                 },
                 child: Padding(
                   padding: const EdgeInsets.only(right: 8.0),
@@ -140,12 +69,13 @@ class UserInterfaceService {
                     size: 20,
                   ),
                 ),
-              ) : null
+              )
+            : null,
       );
     }).toList();
   }
 
-  void _showRouteAlertsDialog(
+  void showRouteAlertsDialog(
     BuildContext context,
     gtfsRoute route,
     List<AlertEntity> alerts,
@@ -217,27 +147,27 @@ class UserInterfaceService {
     );
   }
 
-List<Polyline<Object>> buildTripPolyline(
-  String? routeId,
-  List<Shape> shapes,
-  Color colorFromHex,
-) {
-  shapes.sort((a, b) => a.shapePtSequence.compareTo(b.shapePtSequence));
+  List<Polyline<Object>> buildTripPolyline(
+    String? routeId,
+    List<Shape> shapes,
+    Color colorFromHex,
+  ) {
+    shapes.sort((a, b) => a.shapePtSequence.compareTo(b.shapePtSequence));
 
-  final points = shapes
-      .map((s) => LatLng(s.shapePtLat, s.shapePtLon))
-      .toList();
+    final points = shapes
+        .map((s) => LatLng(s.shapePtLat, s.shapePtLon))
+        .toList();
 
-  final polyline = Polyline<Object>(
-    points: points,
-    strokeWidth: 4.0,
-    color: colorFromHex,
-    useStrokeWidthInMeter: false,
-    hitValue: routeId, 
-  );
+    final polyline = Polyline<Object>(
+      points: points,
+      strokeWidth: 4.0,
+      color: colorFromHex,
+      useStrokeWidthInMeter: false,
+      hitValue: routeId,
+    );
 
-  return [polyline];
-}
+    return [polyline];
+  }
 
   List<Marker> buildStopMarkers(
     VehiclePositionEntity vehicle,
@@ -290,29 +220,26 @@ List<Polyline<Object>> buildTripPolyline(
     return newStopMarkers;
   }
 
-  List<Marker> buildSimpleStopMarkers(
-  List<Stop> stops,
-  Color colorFromHex,
-) {
-  List<Marker> newStopMarkers = [];
+  List<Marker> buildSimpleStopMarkers(List<Stop> stops, Color colorFromHex) {
+    List<Marker> newStopMarkers = [];
 
-  for (var stop in stops) {
-    newStopMarkers.add(
-      Marker(
-        point: LatLng(stop.stopLat, stop.stopLon),
-        width: 200.0, 
-        height: 175.0, 
-        alignment: Alignment.center,
-        child: SimpleStopMarkerPopup(
-          stopName: stop.stopName,
-          color: colorFromHex,
+    for (var stop in stops) {
+      newStopMarkers.add(
+        Marker(
+          point: LatLng(stop.stopLat, stop.stopLon),
+          width: 200.0,
+          height: 175.0,
+          alignment: Alignment.center,
+          child: SimpleStopMarkerPopup(
+            stopName: stop.stopName,
+            color: colorFromHex,
+          ),
         ),
-      ),
-    );
-  }
+      );
+    }
 
-  return newStopMarkers;
-}
+    return newStopMarkers;
+  }
 
   Color colorFromHex(String hexColor) {
     String color = hexColor.toUpperCase().replaceAll('#', '');
@@ -887,11 +814,11 @@ class _SimpleStopMarkerPopupState extends State<SimpleStopMarkerPopup> {
                       widget.stopName,
                       style: const TextStyle(
                         color: Colors.black,
-                        fontSize: 12, 
+                        fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),
                       textAlign: TextAlign.center,
-                      maxLines: 2, 
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),

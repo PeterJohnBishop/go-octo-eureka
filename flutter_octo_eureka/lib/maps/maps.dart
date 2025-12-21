@@ -42,11 +42,13 @@ class _MapViewState extends State<MapView> {
   MapController _mapController = MapController();
   Marker? _userLocationMarker;
   final LayerHitNotifier<Object> _hitNotifier = ValueNotifier(null);
+  final SearchController _searchController = SearchController();
 
   @override
   void initState() {
     super.initState();
     _determinePosition();
+    _handleAlertsLoading();
     Future.delayed(Duration.zero);
     _handleVehiclePositionLoading();
     _startAutoRefresh();
@@ -55,6 +57,7 @@ class _MapViewState extends State<MapView> {
   @override
   void dispose() {
     _updateTimer?.cancel();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -388,6 +391,20 @@ class _MapViewState extends State<MapView> {
         .join('&');
   }
 
+  void _clearSearchSelection() {
+    setState(() {
+      _selectedRouteId = null;
+      _searchController.text = "";
+      // ... clear other lists ...
+    });
+  }
+
+  void _updateSearchSelection(String text) {
+    setState(() {
+      _searchController.text = text;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -495,7 +512,7 @@ class _MapViewState extends State<MapView> {
                   _shapes = [];
                   _stops = [];
                 });
-                // _loadTrips(_vehiclePositions);
+                _clearSearchSelection();
                 _determinePosition();
               },
             ),
@@ -524,6 +541,11 @@ class _MapViewState extends State<MapView> {
                               _stopMarkers = [];
                               _selectedRouteId = "$tappedData";
                             });
+                            gtfsRoute route = _routes.firstWhere(
+                              (r) => r.routeId == "$tappedData",
+                              orElse: () => _routes.first,
+                            );
+                            // _updateSearchSelection("${route.routeShortName}: ${route.routeLongName}");
                             _handleVehicleTripLoading(
                               _vehiclePositions,
                               "$tappedData",
@@ -567,7 +589,85 @@ class _MapViewState extends State<MapView> {
                 Padding(
                   padding: EdgeInsets.all(8),
                   child: SearchAnchor(
+                    searchController: _searchController,
                     builder: (context, controller) {
+                      gtfsRoute? route;
+                      if (_selectedRouteId != null && _routes.isNotEmpty) {
+                        try {
+                          route = _routes.firstWhere(
+                            (r) => r.routeId == _selectedRouteId,
+                          );
+                        } catch (_) {
+                          route = null;
+                        }
+                      }
+
+                      if (route != null) {
+                        final bool hasAlerts = uiService.checkRouteAlerts(
+                          _alerts,
+                          route.routeId,
+                        );
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Card(
+                            elevation: 2,
+                            clipBehavior: Clip.antiAlias,
+                            child: InkWell(
+                              onTap: () => controller.openView(),
+                              child: ListTile(
+                                leading: Icon(
+                                  (route.routeType == 0 || route.routeType == 2)
+                                      ? Icons.train
+                                      : Icons.directions_bus,
+                                  color: uiService.colorFromHex(
+                                    route.routeColor,
+                                  ),
+                                  size: 24,
+                                ),
+                                title: Text(
+                                  "${route.routeShortName}: ${route.routeLongName}",
+                                  style: const TextStyle(fontSize: 14),
+                                  softWrap: true, // Allow wrapping
+                                  maxLines: 2,
+                                ),
+                                trailing: hasAlerts
+                                    ? GestureDetector(
+                                        onTap: () {
+                                          final routeAlerts = _alerts.where((
+                                            alert,
+                                          ) {
+                                            return alert.alert.informedEntity
+                                                .any(
+                                                  (entity) =>
+                                                      entity.routeId ==
+                                                      route!.routeId,
+                                                );
+                                          }).toList();
+
+                                          uiService.showRouteAlertsDialog(
+                                            context,
+                                            route!,
+                                            routeAlerts,
+                                          );
+                                        },
+                                        child: Padding(
+                                          padding: const EdgeInsets.only(
+                                            left: 8.0,
+                                          ),
+                                          child: Icon(
+                                            Icons.warning_amber_rounded,
+                                            color: Colors.amber,
+                                            size: 20,
+                                          ),
+                                        ),
+                                      )
+                                    : null,
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+
                       return SearchBar(
                         controller: controller,
                         hintText: "Search for a route...",

@@ -340,11 +340,7 @@ class _MapViewState extends State<MapView> {
         point: LatLng(position.latitude, position.longitude),
         width: 35.0,
         height: 35.0,
-        child: Icon(
-          Icons.person_pin_circle_sharp,
-          color: Colors.yellow[900],
-          size: 40.0,
-        ),
+        child: Icon(Icons.man_3, color: Colors.yellow[900], size: 40.0),
       );
       _mapController.move(LatLng(position.latitude, position.longitude), 13.0);
     });
@@ -411,7 +407,6 @@ class _MapViewState extends State<MapView> {
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          const SizedBox(height: 8),
           FloatingActionButton.small(
             heroTag: "feedback",
             onPressed: () {
@@ -443,7 +438,38 @@ class _MapViewState extends State<MapView> {
                 ? const CircularProgressIndicator()
                 : Icon(Icons.refresh),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 80),
+          FloatingActionButton.small(
+            elevation: 4,
+            backgroundColor: Colors.white,
+            onPressed: () async {
+              setState(() {
+                _selectedRouteId = null;
+                _selectedVehicleId = null;
+                _activePolylines = [];
+                _activeMarkers = [];
+                _vehicleMarkers = [];
+                _stopMarkers = [];
+                _stopTimes = [];
+                _shapes = [];
+                _stops = [];
+              });
+              double lat = _mapController.camera.center.latitude;
+              double lon = _mapController.camera.center.longitude;
+              _handlePolylineLoading(lat, lon, 1.0);
+              setState(() => _isLoading = false);
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 5),
+              child: Icon(
+                Icons.transform_outlined,
+                color: Colors.yellow[900],
+                size: 28.0,
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 16),
           FloatingActionButton.small(
             heroTag: "zoom_in",
             onPressed: _zoomIn,
@@ -451,7 +477,7 @@ class _MapViewState extends State<MapView> {
             foregroundColor: Colors.black,
             child: const Icon(Icons.add),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
           FloatingActionButton.small(
             heroTag: "zoom_out",
             onPressed: _zoomOut,
@@ -460,6 +486,7 @@ class _MapViewState extends State<MapView> {
             child: const Icon(Icons.remove),
           ),
           const SizedBox(height: 16),
+
           FloatingActionButton.small(
             elevation: 4,
             backgroundColor: Colors.white,
@@ -545,7 +572,6 @@ class _MapViewState extends State<MapView> {
                               (r) => r.routeId == "$tappedData",
                               orElse: () => _routes.first,
                             );
-                            // _updateSearchSelection("${route.routeShortName}: ${route.routeLongName}");
                             _handleVehicleTripLoading(
                               _vehiclePositions,
                               "$tappedData",

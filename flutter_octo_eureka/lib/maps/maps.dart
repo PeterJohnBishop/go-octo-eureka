@@ -408,38 +408,6 @@ class _MapViewState extends State<MapView> {
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
           FloatingActionButton.small(
-            heroTag: "feedback",
-            onPressed: () {
-              final Uri emailLaunchUri = Uri(
-                scheme: 'mailto',
-                path: 'pjb.den@gmail.com',
-                query: encodeQueryParameters(<String, String>{
-                  'subject': 'Feedback & Feature Requests!',
-                }),
-              );
-              launchUrl(emailLaunchUri);
-            },
-            backgroundColor: Colors.white,
-            foregroundColor: Colors.black,
-            child: Icon(Icons.feedback),
-          ),
-          const SizedBox(height: 8),
-          FloatingActionButton.small(
-            heroTag: "refresh",
-            onPressed: () {
-              setState(() {
-                _handleAlertsLoading();
-                _handleVehiclePositionLoading();
-              });
-            },
-            backgroundColor: Colors.white,
-            foregroundColor: Colors.black,
-            child: _isLoading
-                ? const CircularProgressIndicator()
-                : Icon(Icons.refresh),
-          ),
-          const SizedBox(height: 80),
-          FloatingActionButton.small(
             elevation: 4,
             backgroundColor: Colors.white,
             onPressed: () async {
@@ -468,7 +436,7 @@ class _MapViewState extends State<MapView> {
               ),
             ),
           ),
-          
+
           const SizedBox(height: 16),
           FloatingActionButton.small(
             heroTag: "zoom_in",
@@ -747,6 +715,48 @@ class _MapViewState extends State<MapView> {
                       );
                     },
                   ),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.all(8),
+                      child: FloatingActionButton.small(
+                        heroTag: "feedback",
+                        onPressed: () {
+                          final Uri emailLaunchUri = Uri(
+                            scheme: 'mailto',
+                            path: 'feedback@gorunapp.live',
+                            query: encodeQueryParameters(<String, String>{
+                              'subject':
+                                  'GoFindTransit | Feedback & Feature Requests!',
+                            }),
+                          );
+                          launchUrl(emailLaunchUri);
+                        },
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black,
+                        child: Icon(Icons.feedback),
+                      ),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.all(8),
+                      child: FloatingActionButton.small(
+                        heroTag: "refresh",
+                        onPressed: () {
+                          setState(() {
+                            _handleAlertsLoading();
+                            _handleVehiclePositionLoading();
+                          });
+                        },
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black,
+                        child: _isLoading
+                            ? const CircularProgressIndicator()
+                            : Icon(Icons.refresh),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

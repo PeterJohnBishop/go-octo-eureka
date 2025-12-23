@@ -8,7 +8,7 @@ To get started, search for or select a route from the menu to see the real time 
 
 If there are any service alerts for that route a yellow caution icon will be shown. Tap it to view the alert messages.
 
-![SearchRoutes](https://github.com/PeterJohnBishop/go-octo-eureka/blob/main/README%20Assets/RoutesNear.gif?raw=true)
+![SearchRoutes](https://github.com/PeterJohnBishop/go-octo-eureka/blob/main/README%20Assets/SearchRoutes.gif?raw=true)
 
 Tap on a vehicle to see it's exact trip on the map, the vehicles current status, and its ETA to the next stop. Stops along the trip will show scheduled arrival and departure times, and an estimate of the actual time the bus or train you selected will arrive.
 

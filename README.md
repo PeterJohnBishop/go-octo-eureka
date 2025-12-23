@@ -2,21 +2,22 @@
 
 ### currently testing on iOS and Android devices
 
-To get started, select a route from the dropdown menu to see the real time location of buses or trains that run that route. Their direction of travel is indicated by the red arrow on the vehicle marker. 
+When the app loads your position will be displayed along with lines drawn for any routes with stops within a mile of your position. You can return to this any time by pressing 'my location' button below the zoom controls. 
 
-![SelectARoute](https://github.com/PeterJohnBishop/go-octo-eureka/blob/main/README%20Assets/SelectARoute.gif?raw=true)
+To get started, search for or select a route from the menu to see the real time location of buses or trains that run that route. Their direction of travel is indicated by the red arrow on the vehicle marker, and every stop on the route is marked. Tap on a marker to see the stop name.
 
 If there are any service alerts for that route a yellow caution icon will be shown. Tap it to view the alert messages.
 
-![ViewAlerts](https://github.com/PeterJohnBishop/go-octo-eureka/blob/main/README%20Assets/ViewAlerts.gif?raw=true)
-werll 
-To see the route traveled by a bus or train, tap it once to see the route on the map with indicators for each stop.
+![SearchRoutes](https://github.com/PeterJohnBishop/go-octo-eureka/blob/main/README%20Assets/RoutesNear.gif?raw=true)
 
-Tap any stop to see stop details including the scheduled arrival and departure time, and if a train or bus will be early or late to a stop. 
+Tap on a vehicle to see it's exact trip on the map, the vehicles current status, and its ETA to the next stop. Stops along the trip will show scheduled arrival and departure times, and an estimate of the actual time the bus or train you selected will arrive.
 
-Tap on the selected vehicle to see it's headsign, current status, if it appears to be running late or early, and the time it was last updated. Estimated average speed of the train or bus traveling to the next stop is also shown.
+![ViewTripDetails](https://github.com/PeterJohnBishop/go-octo-eureka/blob/main/README%20Assets/VehicleTripDetails.gif?raw=true)
 
-![ViewTripDetails](https://github.com/PeterJohnBishop/go-octo-eureka/blob/main/README%20Assets/ViewTripDetails2.gif?raw=true)
+As you explore the map tap the 'routes' button above the zoom controls to show all of the routes in that area with stops located within a mile of the map center. 
+
+![RoutesNearHere](https://github.com/PeterJohnBishop/go-octo-eureka/blob/main/README%20Assets/RoutesNear.gif?raw=true)
+
 
 # go-octo-eureka
 

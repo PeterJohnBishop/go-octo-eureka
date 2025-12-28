@@ -277,10 +277,28 @@ class _MapViewState extends State<MapView> {
           _activePolylines = [];
         });
         _handleVehicleMarkers();
-        _handleTripDetailLoading(vehicle.vehicle.trip.tripId, iconColor);
+        _handleTripDetailLoading(vehicle.vehicle.trip.tripId, iconColor).then((_) {
+                              if (!mounted) return;
+                              if (_hideHints) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: const Text(
+                                    'Showing status and stop details for the selected bus or train.',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                  action: SnackBarAction(
+                                    label: 'Dismiss',
+                                    onPressed: () {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).hideCurrentSnackBar();
+                                    },
+                                  ),
+                                ),
+                              );
+                            });
       },
     );
-
     setState(() {
       _vehicleMarkers = newMarkers;
       _mappededVehiclePositions = newPositions;
@@ -422,6 +440,10 @@ class _MapViewState extends State<MapView> {
 
   @override
   Widget build(BuildContext context) {
+
+    var size = MediaQuery.sizeOf(context);
+    var isPortrait = size.height > size.width;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('GoFind', style: TextStyle(color: Colors.white)),
@@ -431,7 +453,7 @@ class _MapViewState extends State<MapView> {
         actions: <Widget>[],
       ),
       floatingActionButton: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisAlignment: isPortrait ? MainAxisAlignment.center : MainAxisAlignment.end,
         children: [
           FloatingActionButton.small(
             elevation: 10,
@@ -605,7 +627,26 @@ class _MapViewState extends State<MapView> {
                             _handleVehicleTripLoading(
                               _vehiclePositions,
                               "$tappedData",
-                            );
+                            ).then((_) {
+                              if (!mounted) return;
+                              if (_hideHints) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: const Text(
+                                    'Showing vehicles and stops for this selected route.',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                  action: SnackBarAction(
+                                    label: 'Dismiss',
+                                    onPressed: () {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).hideCurrentSnackBar();
+                                    },
+                                  ),
+                                ),
+                              );
+                            });
                           }
                         }
                       },

@@ -43,6 +43,7 @@ class _MapViewState extends State<MapView> {
   Marker? _userLocationMarker;
   final LayerHitNotifier<Object> _hitNotifier = ValueNotifier(null);
   final SearchController _searchController = SearchController();
+  bool _hideHints = false;
 
   @override
   void initState() {
@@ -50,7 +51,25 @@ class _MapViewState extends State<MapView> {
     _determinePosition();
     _handleAlertsLoading();
     Future.delayed(Duration.zero);
-    _handleVehiclePositionLoading();
+    _handleVehiclePositionLoading().then((_) {
+      if (!mounted) return;
+      if (_hideHints) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Showing routes with stops within 1 mile of your location.',
+            style: TextStyle(color: Colors.white),
+          ),
+          action: SnackBarAction(
+            label: 'Dismiss',
+            onPressed: () {
+              // Code to execute.
+              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            },
+          ),
+        ),
+      );
+    });
     _startAutoRefresh();
   }
 
@@ -404,11 +423,18 @@ class _MapViewState extends State<MapView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('GoFind', style: TextStyle(color: Colors.white)),
+        backgroundColor: Colors.black,
+        elevation: 4,
+        shadowColor: Colors.black.withValues(alpha: 4),
+        actions: <Widget>[],
+      ),
       floatingActionButton: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           FloatingActionButton.small(
-            elevation: 4,
+            elevation: 10,
             backgroundColor: Colors.white,
             onPressed: () async {
               setState(() {
@@ -424,7 +450,25 @@ class _MapViewState extends State<MapView> {
               });
               double lat = _mapController.camera.center.latitude;
               double lon = _mapController.camera.center.longitude;
-              _handlePolylineLoading(lat, lon, 1.0);
+              _handlePolylineLoading(lat, lon, 1.0).then((_) {
+                if (!mounted) return;
+                if (_hideHints) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text(
+                      'Showing routes with stops within 1 mile of the map center.',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    action: SnackBarAction(
+                      label: 'Dismiss',
+                      onPressed: () {
+                        // Code to execute.
+                        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                      },
+                    ),
+                  ),
+                );
+              });
               setState(() => _isLoading = false);
             },
             child: Container(
@@ -470,7 +514,25 @@ class _MapViewState extends State<MapView> {
                 _shapes = [];
                 _stops = [];
               });
-              await _determinePosition();
+              await _determinePosition().then((_) {
+                if (!mounted) return;
+                if (_hideHints) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text(
+                      'Showing routes with stops within 1 mile of your location.',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    action: SnackBarAction(
+                      label: 'Dismiss',
+                      onPressed: () {
+                        // Code to execute.
+                        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                      },
+                    ),
+                  ),
+                );
+              });
               setState(() => _isLoading = false);
             },
             child: Container(
@@ -715,48 +777,6 @@ class _MapViewState extends State<MapView> {
                       );
                     },
                   ),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: EdgeInsets.all(8),
-                      child: FloatingActionButton.small(
-                        heroTag: "feedback",
-                        onPressed: () {
-                          final Uri emailLaunchUri = Uri(
-                            scheme: 'mailto',
-                            path: 'feedback@gorunapp.live',
-                            query: encodeQueryParameters(<String, String>{
-                              'subject':
-                                  'GoFindTransit | Feedback & Feature Requests!',
-                            }),
-                          );
-                          launchUrl(emailLaunchUri);
-                        },
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.black,
-                        child: Icon(Icons.feedback),
-                      ),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.all(8),
-                      child: FloatingActionButton.small(
-                        heroTag: "refresh",
-                        onPressed: () {
-                          setState(() {
-                            _handleAlertsLoading();
-                            _handleVehiclePositionLoading();
-                          });
-                        },
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.black,
-                        child: _isLoading
-                            ? const CircularProgressIndicator()
-                            : Icon(Icons.refresh),
-                      ),
-                    ),
-                  ],
                 ),
               ],
             ),

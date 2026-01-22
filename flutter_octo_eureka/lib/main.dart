@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_octo_eureka/maps/maps.dart';
+import 'package:flutter_octo_eureka/map.dart';
 
 void main() {
   runApp(const MyApp());

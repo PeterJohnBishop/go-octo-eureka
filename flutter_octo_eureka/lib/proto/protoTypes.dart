@@ -94,6 +94,7 @@ class RouteItem {
     String routeLongName;
     String routeColor;
     String routeTextColor;
+    int? routeType; 
 
     RouteItem({
         required this.routeId,
@@ -101,6 +102,7 @@ class RouteItem {
         required this.routeLongName,
         required this.routeColor,
         required this.routeTextColor,
+        this.routeType, 
     });
 
     factory RouteItem.fromRawJson(String str) => RouteItem.fromJson(json.decode(str));
@@ -113,6 +115,7 @@ class RouteItem {
         routeLongName: json["route_long_name"],
         routeColor: json["route_color"],
         routeTextColor: json["route_text_color"],
+        routeType: json["route_type"], 
     );
 
     Map<String, dynamic> toJson() => {
@@ -121,5 +124,6 @@ class RouteItem {
         "route_long_name": routeLongName,
         "route_color": routeColor,
         "route_text_color": routeTextColor,
+        "route_type": routeType, 
     };
 }

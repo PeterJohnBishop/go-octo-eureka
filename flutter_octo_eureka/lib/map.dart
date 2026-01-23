@@ -23,6 +23,7 @@ class _MapViewState extends State<MapView> {
   final UserInterfaceService ui = UserInterfaceService();
   bool _isLoading = true;
   List<RouteItem> _menuItems = [];
+  List<RouteDetail> _tripMenuItems = [];
   List<RouteDetail> _activeRouteDetails = [];
   List<VehiclePositionEntity> _vehiclePositions = [];
   List<AlertEntity> _activeAlerts = [];
@@ -179,27 +180,77 @@ class _MapViewState extends State<MapView> {
     }
   }
 
+  // request route details and draw route line when selected
   Future<void> _handleRouteLoading(String routeId) async {
-    setState(() => _isLoading = true);
-    List<RouteDetail> routeDetail = [];
-    routeDetail = await proto.fetchRouteDetailsByRouteId(routeId);
-    List<LatLng> routePoints = []; 
-    Color routeColor = Color.fromARGB(0, 0, 0, 0);
-    
-      routePoints.addAll(_decodePolyline(routeDetail[0].encodedPolyline));
-      routeColor = ui.colorFromHex(routeDetail[0].routeColor);
-    
-    List<Polyline> routePolylines = ui.buildTripPolyline(routeId, routePoints, routeColor);
+  setState(() => _isLoading = true);
+
+  try {
+    List<RouteDetail> routeDetails = await proto.fetchRouteDetailsByRouteId(
+      routeId,
+    );
+
+    if (routeDetails.isEmpty) {
+      debugPrint("No details found for route $routeId");
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+
+    // 1. Calculate unique trips (We still need this for the dropdown menu)
+    final uniqueDetails = <RouteDetail>[];
+    final seenHeadsigns = <String>{};
+
+    for (var detail in routeDetails) {
+      final key = detail.tripHeadsign.isNotEmpty
+          ? detail.tripHeadsign
+          : detail.tripId;
+
+      if (!seenHeadsigns.contains(key)) {
+        seenHeadsigns.add(key);
+        uniqueDetails.add(detail);
+      }
+    }
+
+    // 2. Update the dropdown items and processing state
     if (mounted) {
       setState(() {
-        _activeRouteDetails = routeDetail;
-        _activePolylines = routePolylines;
-        _isLoading = false;
-        _zoomToFit(routePoints);
+        _tripMenuItems = uniqueDetails;
       });
+
+      // 3. Automatically select and render the first option
+      if (uniqueDetails.isNotEmpty) {
+        _processRouteData(uniqueDetails.first);
+      }
+    }
+  } catch (e) {
+    debugPrint("Error loading route: $e");
+  } finally {
+    if (mounted) {
+      setState(() => _isLoading = false);
     }
   }
+}
 
+  void _processRouteData(RouteDetail detail) {
+    List<LatLng> routePoints = [];
+    Color routeColor = const Color.fromARGB(0, 0, 0, 0);
+
+    routePoints.addAll(_decodePolyline(detail.encodedPolyline));
+    routeColor = ui.colorFromHex(detail.routeColor);
+
+    List<Polyline> routePolylines = ui.buildTripPolyline(
+      detail.routeId,
+      routePoints,
+      routeColor,
+    );
+
+    setState(() {
+      _activeRouteDetails = [detail];
+      _activePolylines = routePolylines;
+      _zoomToFit(routePoints);
+    });
+  }
+
+  // decode polyline string
   List<LatLng> _decodePolyline(String encoded) {
     final List<List<num>> points = decodePolyline(encoded);
     return points
@@ -219,16 +270,19 @@ class _MapViewState extends State<MapView> {
     });
   }
 
+  // onscreen map control
   void _zoomIn() {
     final currentZoom = _mapController.camera.zoom;
     _mapController.move(_mapController.camera.center, currentZoom + 1);
   }
 
+  // onscreen map control
   void _zoomOut() {
     final currentZoom = _mapController.camera.zoom;
     _mapController.move(_mapController.camera.center, currentZoom - 1);
   }
 
+  // used to move the map to focus on a selected point or route
   void _zoomToFit(List<LatLng> positions) {
     if (positions.isEmpty) return;
 
@@ -256,6 +310,19 @@ class _MapViewState extends State<MapView> {
     var size = MediaQuery.sizeOf(context);
     var isPortrait = size.height > size.width;
 
+    // Calculate the current value for the dropdown.
+    // We match the ID of the currently active route detail to the items in the dropdown menu.
+    RouteDetail? currentDropdownValue;
+    if (_activeRouteDetails.isNotEmpty && _tripMenuItems.isNotEmpty) {
+      try {
+        currentDropdownValue = _tripMenuItems.firstWhere(
+          (t) => t.tripId == _activeRouteDetails.first.tripId,
+        );
+      } catch (_) {
+        currentDropdownValue = null;
+      }
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('GoFind', style: TextStyle(color: Colors.white)),
@@ -273,7 +340,7 @@ class _MapViewState extends State<MapView> {
             elevation: 10,
             backgroundColor: Colors.white,
             onPressed: () async {
-              // TBD
+              // show routes near the center of the map at any time
             },
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 5),
@@ -284,7 +351,6 @@ class _MapViewState extends State<MapView> {
               ),
             ),
           ),
-
           const SizedBox(height: 16),
           FloatingActionButton.small(
             heroTag: "zoom_in",
@@ -302,12 +368,11 @@ class _MapViewState extends State<MapView> {
             child: const Icon(Icons.remove),
           ),
           const SizedBox(height: 16),
-
           FloatingActionButton.small(
             elevation: 4,
             backgroundColor: Colors.white,
             onPressed: () async {
-              // TBD
+              // show the user location and routes near the user at any time
             },
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 5),
@@ -320,7 +385,6 @@ class _MapViewState extends State<MapView> {
           ),
         ],
       ),
-
       body: Stack(
         children: [
           FlutterMap(
@@ -332,7 +396,7 @@ class _MapViewState extends State<MapView> {
                 flags: InteractiveFlag.all,
               ),
               onTap: (tapPosition, point) {
-                // TBD
+                // clear selections
               },
             ),
             children: [
@@ -340,12 +404,12 @@ class _MapViewState extends State<MapView> {
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.flutter_octo_eureka.app',
               ),
-              _activePolylines.isNotEmpty 
-              ? PolylineLayer(polylines: _activePolylines) 
-              : Container(),
-              _userLocationMarker != null 
-              ? MarkerLayer(markers: [_userLocationMarker!])
-              : Container(),
+              _activePolylines.isNotEmpty
+                  ? PolylineLayer(polylines: _activePolylines)
+                  : Container(),
+              _userLocationMarker != null
+                  ? MarkerLayer(markers: [_userLocationMarker!])
+                  : Container(),
               RichAttributionWidget(
                 alignment: AttributionAlignment.bottomLeft,
                 attributions: [
@@ -361,9 +425,10 @@ class _MapViewState extends State<MapView> {
           ),
           SafeArea(
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Padding(
-                  padding: EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(8),
                   child: SearchAnchor(
                     searchController: _searchController,
                     builder: (context, controller) {
@@ -402,7 +467,7 @@ class _MapViewState extends State<MapView> {
                                 title: Text(
                                   "${route.routeShortName}: ${route.routeLongName}",
                                   style: const TextStyle(fontSize: 14),
-                                  softWrap: true, // Allow wrapping
+                                  softWrap: true,
                                   maxLines: 2,
                                 ),
                                 trailing: hasAlerts
@@ -470,22 +535,66 @@ class _MapViewState extends State<MapView> {
                         (selectedRoute) {
                           controller.closeView(selectedRoute);
 
+                          // FIX: Use addPostFrameCallback, but do NOT wrap the function call in setState.
+                          // _handleRouteLoading handles its own setState internally.
                           WidgetsBinding.instance.addPostFrameCallback((_) {
                             if (!mounted) return;
 
-                            setState(() {
-                              // clear previous selections and markers
-                              if (selectedRoute != null) {
-                                _handleRouteLoading(selectedRoute);
-                                // draw route lines
-                              }
-                            });
+                            if (selectedRoute != null) {
+                              _handleRouteLoading(selectedRoute);
+                            }
                           });
                         },
                       );
                     },
                   ),
                 ),
+                // NEW DROPDOWN MENU - Only shows when we have specific trip options
+                if (_tripMenuItems.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                    child: Card(
+                      color: Colors.white.withOpacity(0.95),
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(25.0),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16.0,
+                          vertical: 2.0,
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<RouteDetail>(
+                            isExpanded: true,
+                            hint: const Text("Select Direction/Trip"),
+                            value: currentDropdownValue,
+                            icon: const Icon(Icons.alt_route_rounded),
+                            items: _tripMenuItems.map((RouteDetail trip) {
+                              return DropdownMenuItem<RouteDetail>(
+                                value: trip,
+                                child: Text(
+                                  trip.tripHeadsign.isNotEmpty
+                                      ? trip.tripHeadsign
+                                      : "Trip ${trip.tripId}",
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (RouteDetail? newTrip) {
+                              if (newTrip != null) {
+                                _processRouteData(newTrip);
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),

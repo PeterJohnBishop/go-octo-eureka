@@ -7,6 +7,7 @@ import 'package:flutter_octo_eureka/maps/userInterfaceService.dart';
 import 'package:flutter_octo_eureka/proto/proto.dart';
 import 'package:flutter_octo_eureka/proto/protoTypes.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:google_polyline_algorithm/google_polyline_algorithm.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -22,9 +23,11 @@ class _MapViewState extends State<MapView> {
   final UserInterfaceService ui = UserInterfaceService();
   bool _isLoading = true;
   List<RouteItem> _menuItems = [];
+  List<RouteDetail> _activeRouteDetails = [];
   List<VehiclePositionEntity> _vehiclePositions = [];
   List<AlertEntity> _activeAlerts = [];
   List<TripUpdateEntity> _tripUpdates = [];
+  List<Polyline> _activePolylines = [];
   MapController _mapController = MapController();
   SearchController _searchController = SearchController();
   Marker? _userLocationMarker;
@@ -176,6 +179,34 @@ class _MapViewState extends State<MapView> {
     }
   }
 
+  Future<void> _handleRouteLoading(String routeId) async {
+    setState(() => _isLoading = true);
+    List<RouteDetail> routeDetail = [];
+    routeDetail = await proto.fetchRouteDetailsByRouteId(routeId);
+    List<LatLng> routePoints = []; 
+    Color routeColor = Color.fromARGB(0, 0, 0, 0);
+    
+      routePoints.addAll(_decodePolyline(routeDetail[0].encodedPolyline));
+      routeColor = ui.colorFromHex(routeDetail[0].routeColor);
+    
+    List<Polyline> routePolylines = ui.buildTripPolyline(routeId, routePoints, routeColor);
+    if (mounted) {
+      setState(() {
+        _activeRouteDetails = routeDetail;
+        _activePolylines = routePolylines;
+        _isLoading = false;
+        _zoomToFit(routePoints);
+      });
+    }
+  }
+
+  List<LatLng> _decodePolyline(String encoded) {
+    final List<List<num>> points = decodePolyline(encoded);
+    return points
+        .map((point) => LatLng(point[0].toDouble(), point[1].toDouble()))
+        .toList();
+  }
+
   void _updateUserMarker(Position position) {
     setState(() {
       _userLocationMarker = Marker(
@@ -213,7 +244,7 @@ class _MapViewState extends State<MapView> {
     try {
       final bounds = LatLngBounds.fromPoints(positions);
       _mapController.fitCamera(
-        CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(50.0)),
+        CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(75.0)),
       );
     } catch (e) {
       debugPrint("Zoom error: $e");
@@ -222,7 +253,6 @@ class _MapViewState extends State<MapView> {
 
   @override
   Widget build(BuildContext context) {
-
     var size = MediaQuery.sizeOf(context);
     var isPortrait = size.height > size.width;
 
@@ -235,7 +265,9 @@ class _MapViewState extends State<MapView> {
         actions: <Widget>[],
       ),
       floatingActionButton: Column(
-        mainAxisAlignment: isPortrait ? MainAxisAlignment.center : MainAxisAlignment.end,
+        mainAxisAlignment: isPortrait
+            ? MainAxisAlignment.center
+            : MainAxisAlignment.end,
         children: [
           FloatingActionButton.small(
             elevation: 10,
@@ -275,7 +307,7 @@ class _MapViewState extends State<MapView> {
             elevation: 4,
             backgroundColor: Colors.white,
             onPressed: () async {
-             // TBD
+              // TBD
             },
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 5),
@@ -308,8 +340,12 @@ class _MapViewState extends State<MapView> {
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.flutter_octo_eureka.app',
               ),
-              // add polyline layer
-              // add markers
+              _activePolylines.isNotEmpty 
+              ? PolylineLayer(polylines: _activePolylines) 
+              : Container(),
+              _userLocationMarker != null 
+              ? MarkerLayer(markers: [_userLocationMarker!])
+              : Container(),
               RichAttributionWidget(
                 alignment: AttributionAlignment.bottomLeft,
                 attributions: [
@@ -356,12 +392,11 @@ class _MapViewState extends State<MapView> {
                               onTap: () => controller.openView(),
                               child: ListTile(
                                 leading: Icon(
-                                  (route.routeType == null || route.routeType == 2)
+                                  (route.routeType == null ||
+                                          route.routeType == 2)
                                       ? Icons.train
                                       : Icons.directions_bus,
-                                  color: ui.colorFromHex(
-                                    route.routeColor,
-                                  ),
+                                  color: ui.colorFromHex(route.routeColor),
                                   size: 24,
                                 ),
                                 title: Text(
@@ -373,16 +408,18 @@ class _MapViewState extends State<MapView> {
                                 trailing: hasAlerts
                                     ? GestureDetector(
                                         onTap: () {
-                                          final routeAlerts = _activeAlerts.where((
-                                            alert,
-                                          ) {
-                                            return alert.alert.informedEntity
-                                                .any(
-                                                  (entity) =>
-                                                      entity.routeId ==
-                                                      route!.routeId,
-                                                );
-                                          }).toList();
+                                          final routeAlerts = _activeAlerts
+                                              .where((alert) {
+                                                return alert
+                                                    .alert
+                                                    .informedEntity
+                                                    .any(
+                                                      (entity) =>
+                                                          entity.routeId ==
+                                                          route!.routeId,
+                                                    );
+                                              })
+                                              .toList();
 
                                           ui.showRouteAlertsDialog(
                                             context,
@@ -437,7 +474,11 @@ class _MapViewState extends State<MapView> {
                             if (!mounted) return;
 
                             setState(() {
-                              // TBD
+                              // clear previous selections and markers
+                              if (selectedRoute != null) {
+                                _handleRouteLoading(selectedRoute);
+                                // draw route lines
+                              }
                             });
                           });
                         },

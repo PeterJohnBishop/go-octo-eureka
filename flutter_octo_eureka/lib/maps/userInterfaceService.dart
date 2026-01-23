@@ -148,27 +148,22 @@ class UserInterfaceService {
     );
   }
 
-  // List<Polyline<Object>> buildTripPolyline(
-  //   String? routeId,
-  //   List<Shape> shapes,
-  //   Color colorFromHex,
-  // ) {
-  //   shapes.sort((a, b) => a.shapePtSequence.compareTo(b.shapePtSequence));
+  List<Polyline<Object>> buildTripPolyline(
+    String? routeId,
+    List<LatLng> points,
+    Color colorFromHex,
+  ) {
+  
+    final polyline = Polyline<Object>(
+      points: points,
+      strokeWidth: 4.0,
+      color: colorFromHex,
+      useStrokeWidthInMeter: false,
+      hitValue: routeId,
+    );
 
-  //   final points = shapes
-  //       .map((s) => LatLng(s.shapePtLat, s.shapePtLon))
-  //       .toList();
-
-  //   final polyline = Polyline<Object>(
-  //     points: points,
-  //     strokeWidth: 4.0,
-  //     color: colorFromHex,
-  //     useStrokeWidthInMeter: false,
-  //     hitValue: routeId,
-  //   );
-
-  //   return [polyline];
-  // }
+    return [polyline];
+  }
 
   // List<Marker> buildStopMarkers(
   //   VehiclePositionEntity vehicle,

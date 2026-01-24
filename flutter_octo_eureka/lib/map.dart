@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_octo_eureka/maps/gtfsTypes.dart';
-import 'package:flutter_octo_eureka/maps/userInterfaceService.dart';
 import 'package:flutter_octo_eureka/proto/proto.dart';
 import 'package:flutter_octo_eureka/proto/protoTypes.dart';
 import 'package:geolocator/geolocator.dart';
@@ -20,11 +19,11 @@ class MapView extends StatefulWidget {
 
 class _MapViewState extends State<MapView> {
   final ProtoService proto = ProtoService();
-  final UserInterfaceService ui = UserInterfaceService();
   bool _isLoading = true;
   List<RouteItem> _menuItems = [];
   List<RouteDetail> _tripMenuItems = [];
   List<RouteDetail> _activeRouteDetails = [];
+  List<Marker> _stopMarkers = [];
   List<VehiclePositionEntity> _vehiclePositions = [];
   List<AlertEntity> _activeAlerts = [];
   List<TripUpdateEntity> _tripUpdates = [];
@@ -182,70 +181,121 @@ class _MapViewState extends State<MapView> {
 
   // request route details and draw route line when selected
   Future<void> _handleRouteLoading(String routeId) async {
-  setState(() => _isLoading = true);
+    setState(() => _isLoading = true);
 
-  try {
-    List<RouteDetail> routeDetails = await proto.fetchRouteDetailsByRouteId(
-      routeId,
-    );
+    try {
+      List<RouteDetail> routeDetails = await proto.fetchRouteDetailsByRouteId(
+        routeId,
+      );
 
-    if (routeDetails.isEmpty) {
-      debugPrint("No details found for route $routeId");
-      if (mounted) setState(() => _isLoading = false);
-      return;
-    }
-
-    // 1. Calculate unique trips (We still need this for the dropdown menu)
-    final uniqueDetails = <RouteDetail>[];
-    final seenHeadsigns = <String>{};
-
-    for (var detail in routeDetails) {
-      final key = detail.tripHeadsign.isNotEmpty
-          ? detail.tripHeadsign
-          : detail.tripId;
-
-      if (!seenHeadsigns.contains(key)) {
-        seenHeadsigns.add(key);
-        uniqueDetails.add(detail);
+      if (routeDetails.isEmpty) {
+        debugPrint("No details found for route $routeId");
+        if (mounted) setState(() => _isLoading = false);
+        return;
       }
-    }
 
-    // 2. Update the dropdown items and processing state
-    if (mounted) {
-      setState(() {
-        _tripMenuItems = uniqueDetails;
-      });
+      final uniqueDetails = <RouteDetail>[];
+      final seenHeadsigns = <String>{};
 
-      // 3. Automatically select and render the first option
-      if (uniqueDetails.isNotEmpty) {
-        _processRouteData(uniqueDetails.first);
+      RouteItem result = _menuItems.firstWhere((item) => item.routeId == routeId);
+
+      for (var detail in routeDetails) {
+        final key = detail.tripHeadsign.isNotEmpty
+            ? detail.tripHeadsign
+            : detail.tripId;
+
+        if (!seenHeadsigns.contains(key)) {
+          seenHeadsigns.add(key);
+          uniqueDetails.add(detail);
+        }
       }
-    }
-  } catch (e) {
-    debugPrint("Error loading route: $e");
-  } finally {
-    if (mounted) {
-      setState(() => _isLoading = false);
+
+      if (mounted) {
+        setState(() {
+          _tripMenuItems = uniqueDetails;
+        });
+
+        if (uniqueDetails.isNotEmpty) {
+          _processRouteData(uniqueDetails.first);
+        }
+      }
+    } catch (e) {
+      debugPrint("Error loading route: $e");
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
-}
+
+  List<Marker> _buildBasicStopMarkers(List<Stop> stops, Color colorFromHex) {
+    List<Marker> newStopMarkers = [];
+
+    for (var stop in stops) {
+      newStopMarkers.add(
+        Marker(
+          height: 14,
+          width: 14,
+          alignment: Alignment.center,
+          point: LatLng(stop.stopLat, stop.stopLon),
+          child: Tooltip(
+            message: stop.stopName,
+            triggerMode: TooltipTriggerMode.tap, 
+            preferBelow: false, 
+            verticalOffset: 15, 
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.8),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            textStyle: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: colorFromHex,
+                border: Border.all(color: Colors.white, width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 3,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return newStopMarkers;
+  }
 
   void _processRouteData(RouteDetail detail) {
     List<LatLng> routePoints = [];
+    List<Marker> stopMarkers = [];
     Color routeColor = const Color.fromARGB(0, 0, 0, 0);
 
     routePoints.addAll(_decodePolyline(detail.encodedPolyline));
-    routeColor = ui.colorFromHex(detail.routeColor);
+    routeColor = colorFromHex(detail.routeColor);
 
-    List<Polyline> routePolylines = ui.buildTripPolyline(
+    // build polylines
+    List<Polyline> routePolylines = buildTripPolyline(
       detail.routeId,
       routePoints,
       routeColor,
     );
 
+    // build stop markers
+    stopMarkers = _buildBasicStopMarkers(detail.stops, routeColor);
+
     setState(() {
       _activeRouteDetails = [detail];
       _activePolylines = routePolylines;
+      _stopMarkers = stopMarkers;
       _zoomToFit(routePoints);
     });
   }
@@ -268,6 +318,174 @@ class _MapViewState extends State<MapView> {
       );
       _mapController.move(LatLng(position.latitude, position.longitude), 13.0);
     });
+  }
+
+  List<ListTile> buildSearchListTiles(
+    BuildContext context,
+    List<RouteItem> routes,
+    List<AlertEntity> alerts,
+    Function(String?) onTap,
+  ) {
+    return routes.map((route) {
+      Color routeColor = Colors.black;
+      if (route.routeColor.isNotEmpty) {
+        try {
+          final hex = route.routeColor.replaceAll('#', '');
+          routeColor = Color(int.parse("0xFF$hex"));
+        } catch (_) {
+          // Keep default
+        }
+      }
+
+      final bool hasAlerts = checkRouteAlerts(alerts, route.routeId);
+
+      return ListTile(
+        leading: Icon(
+          (route.routeType == 0 || route.routeType == 2)
+              ? Icons.train
+              : Icons.directions_bus,
+          color: routeColor,
+          size: 24,
+        ),
+        title: Text(
+          "${route.routeShortName}: ${route.routeLongName}",
+          softWrap: true, // Allow wrapping
+          maxLines: 2,
+        ),
+        onTap: () => onTap(route.routeId),
+        trailing: hasAlerts
+            ? GestureDetector(
+                onTap: () {
+                  final routeAlerts = alerts.where((alert) {
+                    return alert.alert.informedEntity.any(
+                      (entity) => entity.routeId == route.routeId,
+                    );
+                  }).toList();
+                  showRouteAlertsDialog(context, route, routeAlerts);
+                },
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: Icon(
+                    Icons.warning_amber_rounded,
+                    color: Colors.amber,
+                    size: 20,
+                  ),
+                ),
+              )
+            : null,
+      );
+    }).toList();
+  }
+
+  void showRouteAlertsDialog(
+    BuildContext context,
+    RouteItem route,
+    List<AlertEntity> alerts,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(
+            "Alerts for ${route.routeShortName}",
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: alerts.isEmpty
+                ? const Text("No details available.")
+                : ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: alerts.length,
+                    itemBuilder: (context, index) {
+                      final alertData = alerts[index].alert;
+
+                      String getTranslation(TranslatedString? ts) {
+                        if (ts == null || ts.translation.isEmpty) return "";
+                        return ts.translation
+                            .firstWhere(
+                              (t) => t.language == 'en',
+                              orElse: () => ts.translation.first,
+                            )
+                            .text;
+                      }
+
+                      final header = getTranslation(alertData.headerText);
+                      final desc = getTranslation(alertData.descriptionText);
+
+                      return Card(
+                        elevation: 2,
+                        margin: const EdgeInsets.symmetric(vertical: 8),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (header.isNotEmpty)
+                                Text(
+                                  header,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.redAccent,
+                                  ),
+                                ),
+                              if (header.isNotEmpty) const SizedBox(height: 8),
+                              Text(desc),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text("Close"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  List<Polyline<Object>> buildTripPolyline(
+    String? routeId,
+    List<LatLng> points,
+    Color colorFromHex,
+  ) {
+    final polyline = Polyline<Object>(
+      points: points,
+      strokeWidth: 4.0,
+      color: colorFromHex,
+      useStrokeWidthInMeter: false,
+      hitValue: routeId,
+    );
+
+    return [polyline];
+  }
+
+  Color colorFromHex(String hexColor) {
+    String color = hexColor.toUpperCase().replaceAll('#', '');
+    if (color.length == 6) {
+      color = 'FF$color';
+    }
+    try {
+      return Color(int.parse(color, radix: 16));
+    } catch (e) {
+      return Colors.blue;
+    }
+  }
+
+  bool checkRouteAlerts(List<AlertEntity> alerts, String routeId) {
+    for (var alert in alerts) {
+      for (var r in alert.alert.informedEntity) {
+        if (r.routeId == routeId) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   // onscreen map control
@@ -310,8 +528,7 @@ class _MapViewState extends State<MapView> {
     var size = MediaQuery.sizeOf(context);
     var isPortrait = size.height > size.width;
 
-    // Calculate the current value for the dropdown.
-    // We match the ID of the currently active route detail to the items in the dropdown menu.
+    
     RouteDetail? currentDropdownValue;
     if (_activeRouteDetails.isNotEmpty && _tripMenuItems.isNotEmpty) {
       try {
@@ -407,7 +624,14 @@ class _MapViewState extends State<MapView> {
               _activePolylines.isNotEmpty
                   ? PolylineLayer(polylines: _activePolylines)
                   : Container(),
-              _userLocationMarker != null
+              _stopMarkers.isNotEmpty
+                  ? MarkerLayer(
+                      markers: [
+                        ..._stopMarkers,
+                        if (_userLocationMarker != null) _userLocationMarker!,
+                      ],
+                    )
+                  : _userLocationMarker != null
                   ? MarkerLayer(markers: [_userLocationMarker!])
                   : Container(),
               RichAttributionWidget(
@@ -444,7 +668,7 @@ class _MapViewState extends State<MapView> {
                       }
 
                       if (route != null) {
-                        final bool hasAlerts = ui.checkRouteAlerts(
+                        final bool hasAlerts = checkRouteAlerts(
                           _activeAlerts,
                           route.routeId,
                         );
@@ -461,7 +685,7 @@ class _MapViewState extends State<MapView> {
                                           route.routeType == 2)
                                       ? Icons.train
                                       : Icons.directions_bus,
-                                  color: ui.colorFromHex(route.routeColor),
+                                  color: colorFromHex(route.routeColor),
                                   size: 24,
                                 ),
                                 title: Text(
@@ -486,7 +710,7 @@ class _MapViewState extends State<MapView> {
                                               })
                                               .toList();
 
-                                          ui.showRouteAlertsDialog(
+                                          showRouteAlertsDialog(
                                             context,
                                             route!,
                                             routeAlerts,
@@ -528,7 +752,7 @@ class _MapViewState extends State<MapView> {
                         return name.contains(keyword);
                       }).toList();
 
-                      return ui.buildSearchListTiles(
+                      return buildSearchListTiles(
                         context,
                         filteredRoutes,
                         _activeAlerts,
@@ -571,11 +795,12 @@ class _MapViewState extends State<MapView> {
                             value: currentDropdownValue,
                             icon: const Icon(Icons.alt_route_rounded),
                             items: _tripMenuItems.map((RouteDetail trip) {
+                              RouteItem result = _menuItems.firstWhere((item) => item.routeId == trip.routeId);
                               return DropdownMenuItem<RouteDetail>(
                                 value: trip,
                                 child: Text(
                                   trip.tripHeadsign.isNotEmpty
-                                      ? trip.tripHeadsign
+                                      ? result.routeType == 3 ? "${result.routeShortName}: ${result.routeLongName} - ${trip.tripHeadsign}" : trip.tripHeadsign
                                       : "Trip ${trip.tripId}",
                                   style: const TextStyle(
                                     fontSize: 14,

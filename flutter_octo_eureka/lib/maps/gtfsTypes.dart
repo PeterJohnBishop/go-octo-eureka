@@ -285,86 +285,86 @@ class StopTime {
   }
 }
 
-class Stop {
-  final String stopId;
-  final String stopCode;
-  final String stopName;
-  final String stopDesc;
-  final double stopLat;
-  final double stopLon;
-  final String zoneId;
-  final String stopUrl;
-  final int locationType;
-  final String parentStation;
-  final String stopTimezone;
-  final int wheelchairBoarding;
+// class Stop {
+//   final String stopId;
+//   final String stopCode;
+//   final String stopName;
+//   final String stopDesc;
+//   final double stopLat;
+//   final double stopLon;
+//   final String zoneId;
+//   final String stopUrl;
+//   final int locationType;
+//   final String parentStation;
+//   final String stopTimezone;
+//   final int wheelchairBoarding;
 
-  Stop({
-    required this.stopId,
-    required this.stopCode,
-    required this.stopName,
-    required this.stopDesc,
-    required this.stopLat,
-    required this.stopLon,
-    required this.zoneId,
-    required this.stopUrl,
-    required this.locationType,
-    required this.parentStation,
-    required this.stopTimezone,
-    required this.wheelchairBoarding,
-  });
+//   Stop({
+//     required this.stopId,
+//     required this.stopCode,
+//     required this.stopName,
+//     required this.stopDesc,
+//     required this.stopLat,
+//     required this.stopLon,
+//     required this.zoneId,
+//     required this.stopUrl,
+//     required this.locationType,
+//     required this.parentStation,
+//     required this.stopTimezone,
+//     required this.wheelchairBoarding,
+//   });
 
-  factory Stop.fromJson(Map<String, dynamic> json) {
-    return Stop(
-      stopId: json['stop_id'] ?? '',
-      stopCode: json['stop_code'] ?? '',
-      stopName: json['stop_name'] ?? '',
-      stopDesc: json['stop_desc'] ?? '',
-      stopLat: (json['stop_lat'] as num?)?.toDouble() ?? 0.0,
-      stopLon: (json['stop_lon'] as num?)?.toDouble() ?? 0.0,
-      zoneId: json['zone_id'] ?? '',
-      stopUrl: json['stop_url'] ?? '',
-      locationType: json['location_type'] ?? 0,
-      parentStation: json['parent_station'] ?? '',
-      stopTimezone: json['stop_timezone'] ?? '',
-      wheelchairBoarding: json['wheelchair_boarding'] ?? 0,
-    );
-  }
+//   factory Stop.fromJson(Map<String, dynamic> json) {
+//     return Stop(
+//       stopId: json['stop_id'] ?? '',
+//       stopCode: json['stop_code'] ?? '',
+//       stopName: json['stop_name'] ?? '',
+//       stopDesc: json['stop_desc'] ?? '',
+//       stopLat: (json['stop_lat'] as num?)?.toDouble() ?? 0.0,
+//       stopLon: (json['stop_lon'] as num?)?.toDouble() ?? 0.0,
+//       zoneId: json['zone_id'] ?? '',
+//       stopUrl: json['stop_url'] ?? '',
+//       locationType: json['location_type'] ?? 0,
+//       parentStation: json['parent_station'] ?? '',
+//       stopTimezone: json['stop_timezone'] ?? '',
+//       wheelchairBoarding: json['wheelchair_boarding'] ?? 0,
+//     );
+//   }
 
-  Map<String, dynamic> toJson() {
-    return {
-      'stop_id': stopId,
-      'stop_code': stopCode,
-      'stop_name': stopName,
-      'stop_desc': stopDesc,
-      'stop_lat': stopLat,
-      'stop_lon': stopLon,
-      'zone_id': zoneId,
-      'stop_url': stopUrl,
-      'location_type': locationType,
-      'parent_station': parentStation,
-      'stop_timezone': stopTimezone,
-      'wheelchair_boarding': wheelchairBoarding,
-    };
-  }
+//   Map<String, dynamic> toJson() {
+//     return {
+//       'stop_id': stopId,
+//       'stop_code': stopCode,
+//       'stop_name': stopName,
+//       'stop_desc': stopDesc,
+//       'stop_lat': stopLat,
+//       'stop_lon': stopLon,
+//       'zone_id': zoneId,
+//       'stop_url': stopUrl,
+//       'location_type': locationType,
+//       'parent_station': parentStation,
+//       'stop_timezone': stopTimezone,
+//       'wheelchair_boarding': wheelchairBoarding,
+//     };
+//   }
 
-  factory Stop.empty() {
-    return Stop(
-      stopId: "",
-      stopCode: "",
-      stopName: "Unknown Stop",
-      stopDesc: "",
-      stopLat: 0.0,
-      stopLon: 0.0,
-      zoneId: "",
-      stopUrl: "",
-      locationType: 0,
-      parentStation: "",
-      stopTimezone: "",
-      wheelchairBoarding: 0,
-    );
-  }
-}
+//   factory Stop.empty() {
+//     return Stop(
+//       stopId: "",
+//       stopCode: "",
+//       stopName: "Unknown Stop",
+//       stopDesc: "",
+//       stopLat: 0.0,
+//       stopLon: 0.0,
+//       zoneId: "",
+//       stopUrl: "",
+//       locationType: 0,
+//       parentStation: "",
+//       stopTimezone: "",
+//       wheelchairBoarding: 0,
+//     );
+//   }
+// }
 
 class AlertEntity {
   final String id;
